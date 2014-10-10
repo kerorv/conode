@@ -1,0 +1,10 @@
+cmake_minimum_required(VERSION 2.8)
+
+project(socketnode)
+include_directories(${CMAKE_SOURCE_DIR}/../include)
+link_directories(${CMAKE_SOURCE_DIR}/../lib)
+set(LIB_SRC socketnode.cpp socketserver.cpp epoll.cpp listensocket.cpp streamsocket.cpp utility.cpp socketsendclientmsg.cpp)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11 -g")
+set(LIBRARY_OUTPUT_PATH ${CMAKE_SOURCE_DIR}/../lib)
+add_library(socketnode SHARED ${LIB_SRC})
+target_link_libraries(socketnode libcppsproto.a)
