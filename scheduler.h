@@ -9,6 +9,7 @@
 #include "msgrouter.h"
 
 class Worker;
+class CnodeModule;
 class Scheduler : public MsgRouter
 {
 public:
@@ -31,10 +32,17 @@ private:
 	int NextWorkerIdx();
 	Worker* GetWorkerByNodeId(unsigned int nid);
 
+	// Cnode
+	bool LoadCnodes();
+
 private:
 	lua_State* ls_;
 	typedef std::vector<Worker*> WorkerVec;
 	WorkerVec workers_;
 	std::atomic<unsigned int> counter_;
+	typedef std::vector<CnodeModule*> CnodeModuleVector;
+	CnodeModuleVector cnode_modules_;
+	typedef std::map<unsigned int, Cnode*> CnodeMap;
+	CnodeMap cnodes_;
 };
 

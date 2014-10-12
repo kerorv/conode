@@ -1,12 +1,12 @@
 #include "socketserver.h"
 
-Cnode* create_cnode()
+Cnode* CreateCnode()
 {
 	Cnode* socket_node = new SocketServer;
 	return socket_node;
 }
 
-void release_cnode(Cnode* node)
+void ReleaseCnode(Cnode* node)
 {
 	delete node;
 }
