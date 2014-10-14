@@ -5,7 +5,7 @@
 #include <functional>
 #include <algorithm>
 #include "capi.h"
-#include "node.h"
+#include "lnode.h"
 #include "worker.h"
 
 #define MAX_NODE_COUNT	0x00FFFFFF
@@ -73,10 +73,10 @@ void Worker::Destroy()
 		thread_->join();
 	}
 
-	for (NodeMap::iterator it = nodes_.begin();
+	for (LnodeMap::iterator it = nodes_.begin();
 			it != nodes_.end(); ++it)
 	{
-		Node* node = it->second;
+		Lnode* node = it->second;
 		node->Destroy();
 		delete node;
 	}
@@ -96,11 +96,11 @@ void Worker::DispatchMsg(const Message& msg)
 	}
 	else
 	{
-		NodeMap::iterator it = nodes_.find(msg.to);
+		LnodeMap::iterator it = nodes_.find(msg.to);
 		if (it == nodes_.end())
 			return;
 
-		Node* node = it->second;
+		Lnode* node = it->second;
 		if (node == nullptr)
 			return;
 
@@ -275,7 +275,7 @@ void Worker::CreateNode(unsigned int nid, const std::string& srcfile,
 		return ;
 	}
 
-	Node* node = new Node(nid);
+	Lnode* node = new Lnode(nid);
 	if (node->Create(ls_, class_name, cache.refnew))
 	{
 		nodes_.insert(std::make_pair(nid, node));
@@ -288,11 +288,11 @@ void Worker::CreateNode(unsigned int nid, const std::string& srcfile,
 
 void Worker::DestroyNode(unsigned int nid)
 {
-	NodeMap::iterator it = nodes_.find(nid);
+	LnodeMap::iterator it = nodes_.find(nid);
 	if (it == nodes_.end())
 		return;
 
-	Node* node = it->second;
+	Lnode* node = it->second;
 	nodes_.erase(it);
 
 	node->Destroy();
@@ -305,21 +305,21 @@ void Worker::DestroyNode(unsigned int nid)
 
 void Worker::CreateTimer(unsigned int nid, unsigned int tid, int interval)
 {
-	NodeMap::iterator it = nodes_.find(nid);
+	LnodeMap::iterator it = nodes_.find(nid);
 	if (it == nodes_.end())
 		return;
 
-	Node* node = it->second;
+	Lnode* node = it->second;
 	ts_.CreateTimer(tid, interval, node);
 }
 
 void Worker::DestroyTimer(unsigned int nid, unsigned int tid)
 {
-	NodeMap::iterator it = nodes_.find(nid);
+	LnodeMap::iterator it = nodes_.find(nid);
 	if (it == nodes_.end())
 		return;
 
-	Node* node = it->second;
+	Lnode* node = it->second;
 	ts_.DestroyTimer(tid, node);
 }
 

@@ -1,24 +1,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "timerservice.h"
-#include "node.h"
+#include "lnode.h"
 
-Node::Node(unsigned int id)
+Lnode::Lnode(unsigned int id)
 	: id_(id)
 	, ref_(LUA_NOREF)
 {
 }
 
-Node::~Node()
+Lnode::~Lnode()
 {
 }
 
-bool Node::Create(lua_State* L,	const std::string& class_name, int refnew)
+bool Lnode::Create(lua_State* L,	const std::string& class_name, int refnew)
 {
 	ls_ = L;
 	name_ = class_name;
 
-	// call SomeNode:New
+	// call SomeLnode:New
 	if (!CallNew(refnew))
 		return false;
 
@@ -38,7 +38,7 @@ bool Node::Create(lua_State* L,	const std::string& class_name, int refnew)
 	return true;
 }
 
-void Node::Destroy()
+void Lnode::Destroy()
 {
 	CallRelease();
 
@@ -60,18 +60,18 @@ void Node::Destroy()
 	}
 }
 
-void Node::ProcessMsg(const Message& msg)
+void Lnode::ProcessMsg(const Message& msg)
 {
 	// call Entity:onmessage
 	CallOnMessage(msg);
 }
 
-void Node::OnTimer(unsigned int tid)
+void Lnode::OnTimer(unsigned int tid)
 {
 	CallOnTimer(tid);
 }
 
-void Node::AddTimer(Timer* timer)
+void Lnode::AddTimer(Timer* timer)
 {
 	if (timer == nullptr)
 		return;
@@ -79,7 +79,7 @@ void Node::AddTimer(Timer* timer)
 	timers_.push_back(timer);
 }
 
-void Node::RemoveTimer(unsigned int tid)
+void Lnode::RemoveTimer(unsigned int tid)
 {
 	for (TimerList::iterator it = timers_.begin();
 			it != timers_.end(); ++it)
@@ -94,7 +94,7 @@ void Node::RemoveTimer(unsigned int tid)
 	}
 }
 
-bool Node::CallNew(int ref)
+bool Lnode::CallNew(int ref)
 {
 	if (ref == LUA_NOREF || ref == LUA_REFNIL)
 		return false;
@@ -110,37 +110,9 @@ bool Node::CallNew(int ref)
 	}
 
 	return true;
-/*
-	lua_getglobal(ls_, name_.c_str());
-	if (lua_istable(ls_, -1) == 0)
-	{
-		lua_pop(ls_, 1);
-		return false;
-	}
-
-	lua_pushstring(ls_, "new");
-	lua_gettable(ls_, -2);
-	if (lua_isfunction(ls_, -1) == 0)
-	{
-		lua_pop(ls_, 2);
-		return false;
-	}
-
-	lua_insert(ls_, 1);
-	lua_pushinteger(ls_, id_);
-	if (lua_pcall(ls_, 2, 1, 0) != 0)
-	{
-		// log error message
-		// TODO
-		// const char* err = lua_tostring(ls_, -1);
-		lua_pop(ls_, -1);
-		return false;
-	}
-
-	return true;*/
 }
 
-void Node::CallRelease()
+void Lnode::CallRelease()
 {
 	if (ref_ == LUA_NOREF)
 		return;
@@ -162,7 +134,7 @@ void Node::CallRelease()
 	}
 }
 
-void Node::CallOnMessage(const Message& msg)
+void Lnode::CallOnMessage(const Message& msg)
 {
 	if (ref_ == LUA_NOREF)
 		return;
@@ -187,7 +159,7 @@ void Node::CallOnMessage(const Message& msg)
 	}
 }
 
-void Node::CallOnTimer(unsigned int tid)
+void Lnode::CallOnTimer(unsigned int tid)
 {
 	if (ref_ == LUA_NOREF)
 		return;

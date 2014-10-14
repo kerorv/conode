@@ -27,13 +27,14 @@ SocketServer::~SocketServer()
 
 int SocketServer::ParseConfig(const char* config)
 {
-	char* pos = strstr(config, "port=");
-	if (pos == nullptr)
-		return 0;
-	pos += 5;
-
-	int port = strtol(pos, nullptr, 10);
-	return port;
+	return 0;
+//	char* pos = strstr(config, "port=");
+//	if (pos == nullptr)
+//		return 0;
+//	pos += 5;
+//
+//	int port = strtol(pos, nullptr, 10);
+//	return port;
 }
 
 bool SocketServer::Create(unsigned int id, MsgRouter* router,

@@ -1,4 +1,3 @@
-#include "node.h"
 #include "timerservice.h"
 
 #define MAX_TIMER_COUNT		0xFFFFFFFF
@@ -18,7 +17,7 @@ TimerService::~TimerService()
 	}
 }
 
-Timer* TimerService::CreateTimer(unsigned tid, int interval, Node* node)
+Timer* TimerService::CreateTimer(unsigned tid, int interval, Lnode* node)
 {
 	Timer* timer = new Timer;
 	timer->id = tid;
@@ -34,7 +33,7 @@ Timer* TimerService::CreateTimer(unsigned tid, int interval, Node* node)
 	return timer;
 }
 
-void TimerService::DestroyTimer(unsigned int tid, Node* node)
+void TimerService::DestroyTimer(unsigned int tid, Lnode* node)
 {
 	node->RemoveTimer(tid);
 }

@@ -33,13 +33,13 @@ private:
 	Worker* GetWorkerByNodeId(unsigned int nid);
 
 	// Cnode
-	void LoadConfig();
 	Cnode* LoadCnode(const std::string& name, unsigned int id, 
 		const std::string& config);
 
 private:
 	int worker_count_;
 	std::string main_node_;
+	unsigned int main_node_id_;
 	typedef std::vector<Worker*> WorkerVec;
 	WorkerVec workers_;
 	std::atomic<unsigned int> counter_;

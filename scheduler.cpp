@@ -15,6 +15,7 @@ Scheduler* Scheduler::GetInstance()
 
 Scheduler::Scheduler()
 	: worker_count_(1)
+	, main_node_id_(0)
 {
 }
 
@@ -24,11 +25,28 @@ Scheduler::~Scheduler()
 
 bool Scheduler::Create(size_t worker_count, const char* main_node)
 {
-	// load cnode
-	LoadConfig();
+	lua_State* L = luaL_newstate();
+	luaL_dofile(L, "config.lua");
+
+	// worker count
+	lua_getglobal(L, "worker");
+	worker_count_ = luaL_checkint(L, -1);
+	if (worker_count_ == 0)
+		worker_count_ = 1;
+	else if (worker_count_ > MAX_WORKER_COUNT)
+		worker_count_ = MAX_WORKER_COUNT;
+	lua_pop(L, 1);
+
+	// main node
+	lua_getglobal(L, "main");
+	this->main_node_ = luaL_checkstring(L, -1);
+	lua_pop(L, 1);
 
 	if (main_node_.empty())
+	{
+		lua_close(L);
 		return false;
+	}
 
 	// load lnode
 	for (size_t i = 0; i < (size_t)worker_count_; ++i)
@@ -40,7 +58,50 @@ bool Scheduler::Create(size_t worker_count, const char* main_node)
 		workers_.push_back(worker);
 	}
 
-	SpawnNode(main_node);
+	main_node_id_ = SpawnNode(main_node);
+	if (main_node_id_ == 0)
+	{
+		lua_close(L);
+		return false;
+	}
+
+	// load cnode
+	lua_getglobal(L, "cnodes");
+	int cnode_count = luaL_len(L, -1);
+	for (int i = 0; i < cnode_count; ++i)
+	{
+		lua_rawgeti(L, -1, i);
+		std::string node_name;
+		unsigned int node_id;
+		std::string node_config;
+		// node name
+		lua_getfield(L, -1, "name");
+		node_name = luaL_checkstring(L, -1);
+		lua_pop(L, 1);
+		// node id
+		lua_getfield(L, -2, "id");
+		node_id = (unsigned int)luaL_checkint(L, -1);
+		lua_pop(L, 1);
+		// node config
+		lua_getfield(L, -3, "config");
+		while (lua_next(L, -1))
+		{
+			node_config += lua_tostring(L, -2); // key
+			node_config += "=";
+			node_config += lua_tostring(L, -1); // value
+			node_config += "\n";
+			lua_pop(L, 1);
+		}
+		lua_pop(L, 1);
+
+		Cnode* node = LoadCnode(node_name, node_id, node_config);
+		if (node == nullptr)
+		{
+			// TODO
+		}
+	}
+	lua_close(L);
+
 	return true;
 }
 
@@ -89,11 +150,39 @@ void Scheduler::CloseNode(unsigned int nid)
 
 void Scheduler::SendMsg(const Message& msg)
 {
-	Worker* worker = GetWorkerByNodeId(msg.to);
-	if (worker == nullptr)
+	if (msg.to == 0)
+	{
 		return;
+	}
+	else if (msg.to == 1) // send to scheduler
+	{
+		// send to main lnode temporarily
+		Message redirect_msg = msg;
+		redirect_msg.to = main_node_id_;
 
-	worker->SendMsg(msg);
+		Worker* worker = GetWorkerByNodeId(redirect_msg.to);
+		if (worker == nullptr)
+			return;
+
+		worker->SendMsg(redirect_msg);
+	}
+	else if (msg.to < workers_[0]->GetId())	// send to cnode
+	{
+		CnodeMap::iterator it = cnodes_.find(msg.to);
+		if (it != cnodes_.end())
+		{
+			Cnode* node = it->second;
+			node->OnMessage(msg);
+		}
+	}
+	else	// send to lnode
+	{
+		Worker* worker = GetWorkerByNodeId(msg.to);
+		if (worker == nullptr)
+			return;
+
+		worker->SendMsg(msg);
+	}
 }
 
 unsigned int Scheduler::SetTimer(unsigned int nid, int interval)
@@ -130,60 +219,6 @@ Worker* Scheduler::GetWorkerByNodeId(unsigned int nid)
 
 	Worker* w = workers_[worker_idx];
 	return w;
-}
-
-void Scheduler::LoadConfig()
-{
-	lua_State* L = luaL_newstate();
-	luaL_dofile(L, "config.lua");
-	// worker count
-	lua_getglobal(L, "worker");
-	worker_count_ = luaL_checkint(L, -1);
-	if (worker_count_ == 0)
-		worker_count_ = 1;
-	else if (worker_count_ > MAX_WORKER_COUNT)
-		worker_count_ = MAX_WORKER_COUNT;
-	lua_pop(L, 1);
-	// main node
-	lua_getglobal(L, "main");
-	this->main_node_ = luaL_checkstring(L, -1);
-	lua_pop(L, 1);
-	// cnode
-	lua_getglobal(L, "cnodes");
-	int cnode_count = luaL_len(L, -1);
-	for (int i = 0; i < cnode_count; ++i)
-	{
-		lua_rawgeti(L, -1, i);
-		std::string node_name;
-		unsigned int node_id;
-		std::string node_config;
-		// node name
-		lua_getfield(L, -1, "name");
-		node_name = luaL_checkstring(L, -1);
-		lua_pop(L, 1);
-		// node id
-		lua_getfield(L, -2, "id");
-		node_id = (unsigned int)luaL_checkint(L, -1);
-		lua_pop(L, 1);
-		// node config
-		lua_getfield(L, -3, "config");
-		while (lua_next(L, -1))
-		{
-			node_config += lua_tostring(L, -2); // key
-			node_config += "=";
-			node_config += lua_tostring(L, -1); // value
-			node_config += "\n";
-			lua_pop(L, 1);
-		}
-		lua_pop(L, 1);
-
-		Cnode* node = LoadCnode(node_name, node_id, node_config);
-		if (node == nullptr)
-		{
-			// TODO
-		}
-	}
-	lua_close(L);
 }
 
 Cnode* Scheduler::LoadCnode(const std::string& name, unsigned int id, 

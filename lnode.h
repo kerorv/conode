@@ -6,11 +6,11 @@
 #include "message.h"
 
 struct Timer;
-class Node
+class Lnode
 {
 public:
-	Node(unsigned int id);
-	~Node();
+	Lnode(unsigned int id);
+	~Lnode();
 
 	bool Create(lua_State* L, const std::string& class_name, int refnew);
 	void Destroy();

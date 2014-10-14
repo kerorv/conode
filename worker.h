@@ -10,7 +10,7 @@
 #include "idallocator.h"
 #include "timerservice.h"
 
-class Node;
+class Lnode;
 class Worker
 {
 public:
@@ -46,8 +46,8 @@ private:
 	lua_State* ls_;
 	std::thread* thread_;
 	bool quit_;
-	typedef std::map<int, Node*> NodeMap;
-	NodeMap nodes_;
+	typedef std::map<int, Lnode*> LnodeMap;
+	LnodeMap nodes_;
 	struct LuaNodeCache
 	{
 		int refnew;

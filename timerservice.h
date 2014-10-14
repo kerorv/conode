@@ -3,15 +3,15 @@
 #include <chrono>
 #include <list>
 #include <mutex>
+#include "lnode.h"
 #include "idallocator.h"
 
-class Node;
 struct Timer
 {
 	unsigned int id;
 	int interval;
 	std::chrono::system_clock::time_point next_time;
-	Node* node;
+	Lnode* node;
 	
 	bool operator < (const Timer& t)
 	{
@@ -25,8 +25,8 @@ public:
 	TimerService();
 	~TimerService();
 
-	Timer* CreateTimer(unsigned int tid, int interval, Node* node);
-	void DestroyTimer(unsigned int tid, Node* node);
+	Timer* CreateTimer(unsigned int tid, int interval, Lnode* node);
+	void DestroyTimer(unsigned int tid, Lnode* node);
 	void OnTick();
 
 	unsigned int AssignTimerId();
