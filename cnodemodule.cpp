@@ -1,4 +1,8 @@
+#include <dlfcn.h>
 #include "cnodemodule.h"
+
+typedef Cnode* (*FuncCreateCnode)();
+typedef void (*FuncReleaseCnode)(Cnode*);
 
 CnodeModule::CnodeModule()
 	: lib_(nullptr)
@@ -14,11 +18,11 @@ CnodeModule::~CnodeModule()
 
 bool CnodeModule::Load(const char* name)
 {
-	void* lib = dlopen(name.c_str(), RTLD_LAZY);
+	void* lib = dlopen(name, RTLD_LAZY);
 	if (lib == nullptr)
 		return false;
-	fcc_ = (FuncCreateCnode*)dlsym(lib, "CreateCnode");
-	frc_ = (FuncReleaseCnode*)dlsym(lib, "ReleaseCnode");
+	fcc_ = dlsym(lib, "CreateCnode");
+	frc_ = dlsym(lib, "ReleaseCnode");
 	if (!fcc_ || !frc_)
 	{
 		Close();
@@ -30,6 +34,15 @@ bool CnodeModule::Load(const char* name)
 
 void CnodeModule::Close()
 {
+	for (CnodeList::iterator it = nodes_.begin();
+			it != nodes_.end(); ++it)
+	{
+		Cnode* node = *it;
+		node->Close();
+		ReleaseCnode(node);
+	}
+	nodes_.clear();
+
 	if (lib_)
 	{
 		dlclose(lib_);
@@ -40,13 +53,21 @@ void CnodeModule::Close()
 	frc_ = nullptr;
 }
 
-Cnode* CnodeModule::CreateCnode(unsigned int id, const char* config)
+Cnode* CnodeModule::CreateCnode()
 {
-	return fcc_(id, config);
+	if (fcc_ == nullptr)
+		return nullptr;
+
+	FuncCreateCnode fcc = (FuncCreateCnode)fcc_;
+	return fcc();
 }
 
 void CnodeModule::ReleaseCnode(Cnode* node)
 {
-	frc_(node);
+	if (frc_ == nullptr)
+		return;
+
+	FuncReleaseCnode frc = (FuncReleaseCnode)frc_;
+	frc(node);
 }
 

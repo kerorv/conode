@@ -1,5 +1,8 @@
+#include "lua.hpp"
 #include "capi.h"
 #include "worker.h"
+#include "cnode.h"
+#include "cnodemodule.h"
 #include "scheduler.h"
 
 #define MAX_WORKER_COUNT	255
@@ -11,7 +14,7 @@ Scheduler* Scheduler::GetInstance()
 }
 
 Scheduler::Scheduler()
-	: ls_(nullptr)
+	: worker_count_(1)
 {
 }
 
@@ -21,12 +24,14 @@ Scheduler::~Scheduler()
 
 bool Scheduler::Create(size_t worker_count, const char* main_node)
 {
-	if (worker_count == 0)
-		worker_count = 1;
-	else if (worker_count > MAX_WORKER_COUNT)
-		worker_count = MAX_WORKER_COUNT;
+	// load cnode
+	LoadConfig();
 
-	for (size_t i = 0; i < worker_count; ++i)
+	if (main_node_.empty())
+		return false;
+
+	// load lnode
+	for (size_t i = 0; i < (size_t)worker_count_; ++i)
 	{
 		Worker* worker = new Worker((unsigned int)(i + 1) << 24);
 		if (!worker->Create())
@@ -51,11 +56,16 @@ void Scheduler::Close()
 
 	workers_.clear();
 
-	if (ls_ != nullptr)
+	for (CnodeModuleMap::iterator it = cnode_modules_.begin();
+			it != cnode_modules_.end(); ++it)
 	{
-		lua_close(ls_);
-		ls_ = nullptr;
+		CnodeModule* module = it->second;
+		module->Close();
+		delete module;
 	}
+
+	cnode_modules_.clear();
+	cnodes_.clear();
 }
 
 unsigned int Scheduler::SpawnNode(const std::string& node_name)
@@ -122,13 +132,23 @@ Worker* Scheduler::GetWorkerByNodeId(unsigned int nid)
 	return w;
 }
 
-bool Scheduler::LoadCnodes()
+void Scheduler::LoadConfig()
 {
-	lua_State* L = lua_newstate();
-	lua_dofile(L, "config.lua");
-	lua_getglobal(L, "worker_count");
-	int worker_count = luaL_checkint(L, -1);
+	lua_State* L = luaL_newstate();
+	luaL_dofile(L, "config.lua");
+	// worker count
+	lua_getglobal(L, "worker");
+	worker_count_ = luaL_checkint(L, -1);
+	if (worker_count_ == 0)
+		worker_count_ = 1;
+	else if (worker_count_ > MAX_WORKER_COUNT)
+		worker_count_ = MAX_WORKER_COUNT;
 	lua_pop(L, 1);
+	// main node
+	lua_getglobal(L, "main");
+	this->main_node_ = luaL_checkstring(L, -1);
+	lua_pop(L, 1);
+	// cnode
 	lua_getglobal(L, "cnodes");
 	int cnode_count = luaL_len(L, -1);
 	for (int i = 0; i < cnode_count; ++i)
@@ -143,7 +163,7 @@ bool Scheduler::LoadCnodes()
 		lua_pop(L, 1);
 		// node id
 		lua_getfield(L, -2, "id");
-		node_id = std::to_string(luaL_checkint(L, -1));
+		node_id = (unsigned int)luaL_checkint(L, -1);
 		lua_pop(L, 1);
 		// node config
 		lua_getfield(L, -3, "config");
@@ -157,19 +177,49 @@ bool Scheduler::LoadCnodes()
 		}
 		lua_pop(L, 1);
 
-		CnodeModule* module = new CnodeModule;
-		if (!module->Load(node_name.c_str()))
+		Cnode* node = LoadCnode(node_name, node_id, node_config);
+		if (node == nullptr)
 		{
-			delete module;
-			return false;
-		}
-
-		Cnode* node = module->CreateCnode();
-		if (node)
-		{
-			cnodes_.push_back(std::make_pair(node_id, node));
+			// TODO
 		}
 	}
 	lua_close(L);
+}
+
+Cnode* Scheduler::LoadCnode(const std::string& name, unsigned int id, 
+		const std::string& config)
+{
+	CnodeModule* module = nullptr;
+	CnodeModuleMap::iterator it = cnode_modules_.find(name);
+	if (it == cnode_modules_.end())
+	{
+		CnodeModule* new_module = new CnodeModule;
+		if (!new_module->Load(name.c_str()))
+		{
+			delete module;
+			return nullptr;
+		}
+
+		cnode_modules_.insert(std::make_pair(name, new_module));
+		module = new_module;
+	}
+	else
+	{
+		module = it->second;
+	}
+
+	Cnode* node = module->CreateCnode();
+	if (node)
+	{
+		if (!node->Create(id, this, config.c_str()))
+		{
+			module->ReleaseCnode(node);
+			return nullptr;
+		}
+
+		cnodes_.insert(std::make_pair(id, node));
+	}
+
+	return node;
 }
 

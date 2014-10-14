@@ -1,3 +1,5 @@
+#include <string.h>
+#include <stdlib.h>
 #include <vector>
 #include <functional>
 #include <sys/types.h>
@@ -6,8 +8,8 @@
 #include "socketsendclientmsg.h"
 #include "socketserver.h"
 
-#define LISTEN_PORT		8021
-#define POLL_INTERVAL	10	// ms
+#define DEFAULT_LISTEN_PORT		8021
+#define POLL_INTERVAL			10	// ms
 
 SocketServer::SocketServer()
 	: maxid_(0)
@@ -23,9 +25,25 @@ SocketServer::~SocketServer()
 	Close();
 }
 
-bool SocketServer::Create(unsigned int id, MsgRouter* router)
+int SocketServer::ParseConfig(const char* config)
 {
-	if (!listener_.Create(LISTEN_PORT, this))
+	char* pos = strstr(config, "port=");
+	if (pos == nullptr)
+		return 0;
+	pos += 5;
+
+	int port = strtol(pos, nullptr, 10);
+	return port;
+}
+
+bool SocketServer::Create(unsigned int id, MsgRouter* router,
+		const char* config)
+{
+	int port = ParseConfig(config);
+	if (port == 0)
+		port = DEFAULT_LISTEN_PORT;
+
+	if (!listener_.Create(port, this))
 		return false;
 
 	if (!poller_.Create())

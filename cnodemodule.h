@@ -1,5 +1,6 @@
 #pragma once
 
+#include <list>
 #include "cnode.h"
 
 class CnodeModule
@@ -11,14 +12,14 @@ public:
 	bool Load(const char* name);
 	void Close();
 
-	Cnode* CreateCnode(unsigned int id, const char* config);
+	Cnode* CreateCnode();
 	void ReleaseCnode(Cnode* node);
 
 private:
 	void* lib_;
-	typedef Cnode* (*FuncCreateCnode)(unsigned int, MsgRouter*);
-	typedef void (*FuncReleaseCnode)(Cnode*);
-	FuncCreateCnode* fcc_;
-	FuncReleaseCnode* frc_;
+	void* fcc_;
+	void* frc_;
+	typedef std::list<Cnode*> CnodeList;
+	CnodeList nodes_;
 };
 

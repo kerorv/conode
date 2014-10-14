@@ -20,7 +20,8 @@ public:
 	virtual ~SocketServer();
 
 	// Cnode implement
-	virtual bool Create(unsigned int id, MsgRouter* router);
+	virtual bool Create(unsigned int id, MsgRouter* router, 
+			const char* config);
 	virtual void Close();
 	virtual void OnMessage(const Message& msg);
 
@@ -39,6 +40,7 @@ protected:
 	void OnNodeMsg(const Message& msg);
 
 	StreamSocket* FindConnection(int sid);
+	int ParseConfig(const char* config);
 
 private:
 	ListenSocket listener_;

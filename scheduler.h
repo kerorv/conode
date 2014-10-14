@@ -4,12 +4,12 @@
 #include <map>
 #include <string>
 #include <atomic>
-#include "lua.hpp"
 #include "message.h"
 #include "msgrouter.h"
 
 class Worker;
 class CnodeModule;
+class Cnode;
 class Scheduler : public MsgRouter
 {
 public:
@@ -33,15 +33,18 @@ private:
 	Worker* GetWorkerByNodeId(unsigned int nid);
 
 	// Cnode
-	bool LoadCnodes();
+	void LoadConfig();
+	Cnode* LoadCnode(const std::string& name, unsigned int id, 
+		const std::string& config);
 
 private:
-	lua_State* ls_;
+	int worker_count_;
+	std::string main_node_;
 	typedef std::vector<Worker*> WorkerVec;
 	WorkerVec workers_;
 	std::atomic<unsigned int> counter_;
-	typedef std::vector<CnodeModule*> CnodeModuleVector;
-	CnodeModuleVector cnode_modules_;
+	typedef std::map<std::string, CnodeModule*> CnodeModuleMap;
+	CnodeModuleMap cnode_modules_;
 	typedef std::map<unsigned int, Cnode*> CnodeMap;
 	CnodeMap cnodes_;
 };
