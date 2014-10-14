@@ -10,3 +10,12 @@
 	msg 1 : string
 }
 
+.SocketConnectionBreakMsg {
+	sid 0 : integer
+	reason 1 : integer
+}
+
+.SocketKickoffConnectionMsg {
+	sid 0 : integer
+}
+

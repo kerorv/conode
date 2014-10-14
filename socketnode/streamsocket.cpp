@@ -33,7 +33,7 @@ void StreamSocket::OnEvent(int events)
 	if (events & EventError)
 	{
 		Close();
-		server_->CloseSocket(this);
+		server_->CloseSocket(this, CS_REASON_EVENT);
 		return;
 	}
 
@@ -78,7 +78,7 @@ bool StreamSocket::ReadHeader()
 	{
 		case 0:
 			{
-				server_->CloseSocket(this);
+				server_->CloseSocket(this, CS_REASON_RECV);
 				return false;
 			}
 			break;
@@ -90,7 +90,7 @@ bool StreamSocket::ReadHeader()
 				}
 				else
 				{
-					server_->CloseSocket(this);
+					server_->CloseSocket(this, CS_REASON_RECV);
 				}
 				return false;
 			}
@@ -120,7 +120,7 @@ bool StreamSocket::ReadBody()
 	{
 		case 0:
 			{
-				server_->CloseSocket(this);
+				server_->CloseSocket(this, CS_REASON_RECV);
 				return false;
 			}
 			break;
@@ -132,7 +132,7 @@ bool StreamSocket::ReadBody()
 				}
 				else
 				{
-					server_->CloseSocket(this);
+					server_->CloseSocket(this, CS_REASON_RECV);
 				}
 				return false;
 			}
@@ -168,6 +168,9 @@ void StreamSocket::OnWrite()
 
 void StreamSocket::SendMsg(const char* msg, int length)
 {
+	if (length > UINT16_MAX)
+		return;
+
 	OutMsg outmsg;
 	outmsg.len = length;
 	outmsg.data = msg;
@@ -194,15 +197,16 @@ void StreamSocket::SendList()
 		OutMsg& msg = *it;
 		if (!SendBlock(msg.data, msg.len, msg.send_bytes))
 		{
-			server_->CloseSocket(this);
+			server_->CloseSocket(this, CS_REASON_SEND);
 			return;
 		}
 		else
 		{
-			if (msg.len == msg.send_bytes)
-				it = outmsgs_.erase(it);
-			else
+			if (msg.len != msg.send_bytes)
 				break;
+
+			free(const_cast<char*>(msg.data));
+			it = outmsgs_.erase(it);
 		}
 	}
 }

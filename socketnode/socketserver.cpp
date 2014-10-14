@@ -1,11 +1,14 @@
 #include <string.h>
 #include <stdlib.h>
+#include <fstream>
 #include <vector>
 #include <functional>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/epoll.h>
 #include "socketsendclientmsg.h"
+#include "socketconnectionbreakmsg.h"
+#include "socketkickoffconnectionmsg.h"
 #include "socketserver.h"
 
 #define DEFAULT_LISTEN_PORT		8021
@@ -17,6 +20,7 @@ SocketServer::SocketServer()
 	, nid_(0)
 	, router_(nullptr)
 	, thread_(nullptr)
+	, sp_(nullptr)
 {
 }
 
@@ -27,14 +31,13 @@ SocketServer::~SocketServer()
 
 int SocketServer::ParseConfig(const char* config)
 {
-	return 0;
-//	char* pos = strstr(config, "port=");
-//	if (pos == nullptr)
-//		return 0;
-//	pos += 5;
-//
-//	int port = strtol(pos, nullptr, 10);
-//	return port;
+	char* pos = strstr(const_cast<char*>(config), "port=");
+	if (pos == nullptr)
+		return 0;
+	pos += 5;
+
+	int port = strtol(pos, nullptr, 10);
+	return port;
 }
 
 bool SocketServer::Create(unsigned int id, MsgRouter* router,
@@ -51,6 +54,8 @@ bool SocketServer::Create(unsigned int id, MsgRouter* router,
 		return false;
 
 	poller_.RegisteHandler(&listener_, EventRead);
+	
+	sp_ = LoadSproto();
 	nid_ = id;
 	router_ = router;
 	stop_ = false;
@@ -71,6 +76,11 @@ void SocketServer::Close()
 
 	poller_.Close();
 	listener_.Close();
+	if (sp_)
+	{
+		delete sp_;
+		sp_ = nullptr;
+	}
 }
 
 void SocketServer::Run()
@@ -134,7 +144,7 @@ void SocketServer::AddSocket(StreamSocket* ss)
 	conns_.insert(std::make_pair(ss->GetId(), ss));
 }
 
-void SocketServer::CloseSocket(StreamSocket* ss)
+void SocketServer::CloseSocket(StreamSocket* ss, int reason)
 {
 	if (ss == NULL)
 		return;
@@ -142,8 +152,19 @@ void SocketServer::CloseSocket(StreamSocket* ss)
 	ss->Close();
 	poller_.UnregisteHandler(ss);
 
-	// notify upper layer
-	// TODO
+	SocketConnectionBreakMsg cbmsg;
+	cbmsg.SetSid(ss->GetId());
+	cbmsg.SetReason(reason);
+	int cbmsg_len = sp_->Encode(&cbmsg);
+	if (cbmsg_len == -1)
+		return;
+	Message msg;
+	msg.type = MSG_TYPE_SOCKET_CONNECTIONBREAK;
+	msg.size = cbmsg_len;
+	msg.content = (char*)malloc(cbmsg_len);
+	memcpy(msg.content, sp_->GetEncodedBuffer(), cbmsg_len);
+	msg.to = 1;	// scheduler
+	router_->SendMsg(msg);
 }
 
 void SocketServer::RemoveSocket(int id)
@@ -202,8 +223,9 @@ void SocketServer::OnNodeMsg(const Message& msg)
 		case MSG_TYPE_SOCKET_SENDCLIENTMSG:
 			{
 				SocketSendClientMsg real_msg;
-				// if (!sp_.Decode(real_msg, msg.content, msg.size))
-				//     return;
+				if (!sp_->Decode(&real_msg, msg.content, msg.size))
+					return;
+
 				StreamSocket* ss = FindConnection(real_msg.GetSid());
 				if (ss == nullptr)
 					return;
@@ -214,8 +236,41 @@ void SocketServer::OnNodeMsg(const Message& msg)
 					ss->SendMsg(outmsg, outmsglen);
 			}
 			break;
+		case MSG_TYPE_SOCKET_KICKOFFCONNECTION:
+			{
+				SocketKickoffConnectionMsg real_msg;
+				if (!sp_->Decode(&real_msg, msg.content, msg.size))
+					return;
+
+				StreamSocket* ss = FindConnection(real_msg.GetSid());
+				if (ss == nullptr)
+					return;
+				
+				CloseSocket(ss, CS_REASON_KICKOFF);
+			}
+			break;
 		default:
 			break;
 	}
+}
+
+CppSproto* SocketServer::LoadSproto()
+{
+	std::ifstream ifs("proto/socketnode.sp", std::ifstream::binary);
+	if (!ifs)
+		return nullptr;
+
+	ifs.seekg(0, ifs.end);
+	int length = ifs.tellg();
+	ifs.seekg(0, ifs.beg);
+	std::string pb;
+	pb.resize(length, ' ');
+
+	char* begin = &*pb.begin();
+	ifs.read(begin, length);
+	ifs.close();
+
+	CppSproto* sp = new CppSproto(pb.c_str(), pb.size());
+	return sp;
 }
 
