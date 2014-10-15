@@ -19,3 +19,7 @@
 	sid 0 : integer
 }
 
+.SocketRemoveConnectionMsg{
+	sid 0 : integer
+}
+

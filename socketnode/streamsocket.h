@@ -16,7 +16,7 @@ public:
 	bool IsActive() { return (fd_ != -1); }
 	int GetId() const { return id_; }
 
-protected:
+private:
 	// EventHandler
 	virtual int GetFd() { return fd_; }
 	virtual void OnEvent(int events);
@@ -24,22 +24,33 @@ protected:
 	void OnRead();
 	void OnWrite();
 
-	bool ReadHeader();
-	bool ReadBody();
+	int ReadHeader();
+	int ReadBody();
+	int ReadBlock(char* block, size_t size);
 
-	void SendList();
-	bool SendBlock(const char* data, int size, int& has_send);
+	int SendList();
+	struct OutMsg;
+	int SendHeader(OutMsg& msg);
+	int SendBody(OutMsg& msg);
+	int SendBlock(const char* block, int size);
 
 private:
 	int fd_;
 	int id_;
 	SocketServer* server_;
 	// write operation
+	enum SendStatus
+	{
+		StatusSendHeader,
+		StatusSendBody,
+		StatusSendOk,
+	};
 	struct OutMsg
 	{
 		uint16_t len;
 		const char* data;
 		int send_bytes;
+		SendStatus status;
 	};
 	typedef std::list<OutMsg> OutMsgList;
 	OutMsgList outmsgs_;

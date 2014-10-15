@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <sys/epoll.h>
 #include "eventhandler.h"
-#include "epoll.h"
+#include "epoll.hpp"
 
 #define MAX_EVENTS 64
 

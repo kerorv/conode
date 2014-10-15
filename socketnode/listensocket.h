@@ -13,7 +13,7 @@ public:
 	bool Create(int port, SocketServer* server);
 	void Close();
 
-protected:
+private:
 	// EventHandler
 	virtual int GetFd() { return fd_; }
 	virtual void OnEvent(int events);

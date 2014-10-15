@@ -8,13 +8,13 @@
 #include "cnode.h"
 #include "msgrouter.h"
 #include "cppsproto.h"
-#include "epoll.h"
+#include "epoll.hpp"
 #include "listensocket.h"
 #include "streamsocket.h"
 
 // close socket reason
 #define CS_REASON_EVENT		1
-#define CS_REASON_RECV		2
+#define CS_REASON_READ		2
 #define CS_REASON_SEND		3
 #define CS_REASON_KICKOFF	4
 

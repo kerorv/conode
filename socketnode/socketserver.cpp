@@ -9,6 +9,7 @@
 #include "socketsendclientmsg.h"
 #include "socketconnectionbreakmsg.h"
 #include "socketkickoffconnectionmsg.h"
+#include "socketremoveconnectionmsg.h"
 #include "socketserver.h"
 
 #define DEFAULT_LISTEN_PORT		8021
@@ -56,6 +57,9 @@ bool SocketServer::Create(unsigned int id, MsgRouter* router,
 	poller_.RegisteHandler(&listener_, EventRead);
 	
 	sp_ = LoadSproto();
+	if (sp_ == nullptr)
+		return false;
+
 	nid_ = id;
 	router_ = router;
 	stop_ = false;
@@ -152,6 +156,7 @@ void SocketServer::CloseSocket(StreamSocket* ss, int reason)
 	ss->Close();
 	poller_.UnregisteHandler(ss);
 
+	// notify logic layer
 	SocketConnectionBreakMsg cbmsg;
 	cbmsg.SetSid(ss->GetId());
 	cbmsg.SetReason(reason);
@@ -249,6 +254,15 @@ void SocketServer::OnNodeMsg(const Message& msg)
 				CloseSocket(ss, CS_REASON_KICKOFF);
 			}
 			break;
+		case MSG_TYPE_SOCKET_REMOVECONNECTION:
+			{
+				SocketRemoveConnectionMsg real_msg;
+				if (!sp_->Decode(&real_msg, msg.content, msg.size))
+					return;
+
+				RemoveSocket(real_msg.GetSid());
+			}
+			break;
 		default:
 			break;
 	}
@@ -256,7 +270,7 @@ void SocketServer::OnNodeMsg(const Message& msg)
 
 CppSproto* SocketServer::LoadSproto()
 {
-	std::ifstream ifs("proto/socketnode.sp", std::ifstream::binary);
+	std::ifstream ifs("proto/socketnode.pb", std::ifstream::binary);
 	if (!ifs)
 		return nullptr;
 
