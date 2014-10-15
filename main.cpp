@@ -8,7 +8,7 @@ int main(int argc, char* argv[])
 {
 	if (argc < 2)
 	{
-		printf("conode main_node_name");
+		printf("Usage: conode main_node_name\n");
 		return -1;
 	}
 

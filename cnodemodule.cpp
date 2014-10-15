@@ -1,3 +1,4 @@
+#include <string>
 #include <dlfcn.h>
 #include "cnodemodule.h"
 
@@ -16,11 +17,18 @@ CnodeModule::~CnodeModule()
 	Close();
 }
 
-bool CnodeModule::Load(const char* name)
+bool CnodeModule::Load(const char* cnode_name)
 {
-	void* lib = dlopen(name, RTLD_LAZY);
+	std::string libname("lib");
+	libname += cnode_name;
+	libname += ".so";
+
+	void* lib = dlopen(libname.c_str(), RTLD_LAZY);
 	if (lib == nullptr)
+	{
 		return false;
+	}
+
 	fcc_ = dlsym(lib, "CreateCnode");
 	frc_ = dlsym(lib, "ReleaseCnode");
 	if (!fcc_ || !frc_)

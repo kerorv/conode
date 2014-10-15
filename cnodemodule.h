@@ -9,7 +9,7 @@ public:
 	CnodeModule();
 	~CnodeModule();
 
-	bool Load(const char* name);
+	bool Load(const char* cnode_name);
 	void Close();
 
 	Cnode* CreateCnode();

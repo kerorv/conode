@@ -34,7 +34,6 @@ public:
 
 protected:
 	void Run();
-	void SendClientMsg(const Message& msg);
 
 	int SpawnId();
 	void RecycleId(int id);

@@ -68,7 +68,7 @@ bool Scheduler::Create(size_t worker_count, const char* main_node)
 	// load cnode
 	lua_getglobal(L, "cnodes");
 	int cnode_count = luaL_len(L, -1);
-	for (int i = 0; i < cnode_count; ++i)
+	for (int i = 1; i <= cnode_count; ++i)
 	{
 		lua_rawgeti(L, -1, i);
 		std::string node_name;
@@ -79,18 +79,14 @@ bool Scheduler::Create(size_t worker_count, const char* main_node)
 		node_name = luaL_checkstring(L, -1);
 		lua_pop(L, 1);
 		// node id
-		lua_getfield(L, -2, "id");
+		lua_getfield(L, -1, "id");
 		node_id = (unsigned int)luaL_checkint(L, -1);
 		lua_pop(L, 1);
 		// node config
-		lua_getfield(L, -3, "config");
-		while (lua_next(L, -1))
+		lua_getfield(L, -1, "config");
+		if (!lua_isnil(L, -1))
 		{
-			node_config += lua_tostring(L, -2); // key
-			node_config += "=";
-			node_config += lua_tostring(L, -1); // value
-			node_config += "\n";
-			lua_pop(L, 1);
+			node_config = luaL_checkstring(L, -1);
 		}
 		lua_pop(L, 1);
 

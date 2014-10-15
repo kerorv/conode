@@ -32,10 +32,11 @@ SocketServer::~SocketServer()
 
 int SocketServer::ParseConfig(const char* config)
 {
-	char* pos = strstr(const_cast<char*>(config), "port=");
+	const char* token = "listenport=";
+	char* pos = strstr(const_cast<char*>(config), token);
 	if (pos == nullptr)
 		return 0;
-	pos += 5;
+	pos += strlen(token);
 
 	int port = strtol(pos, nullptr, 10);
 	return port;
@@ -87,6 +88,12 @@ void SocketServer::Close()
 	}
 }
 
+void SocketServer::OnMessage(const Message& msg)
+{
+	std::lock_guard<std::mutex> lock(msg_mutex_);
+	msgq_.push_back(msg);
+}
+
 void SocketServer::Run()
 {
 	typedef std::vector<Message> MsgVector;
@@ -113,12 +120,6 @@ void SocketServer::Run()
 		}
 		sendmsgs.clear();
 	}
-}
-
-void SocketServer::SendClientMsg(const Message& msg)
-{
-	std::lock_guard<std::mutex> lock(msg_mutex_);
-	msgq_.push_back(msg);
 }
 
 int SocketServer::SpawnId()
