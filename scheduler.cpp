@@ -23,7 +23,7 @@ Scheduler::~Scheduler()
 {
 }
 
-bool Scheduler::Create(size_t worker_count, const char* main_node)
+bool Scheduler::Create()
 {
 	lua_State* L = luaL_newstate();
 	luaL_dofile(L, "config.lua");
@@ -39,7 +39,7 @@ bool Scheduler::Create(size_t worker_count, const char* main_node)
 
 	// main node
 	lua_getglobal(L, "main");
-	this->main_node_ = luaL_checkstring(L, -1);
+	main_node_ = luaL_checkstring(L, -1);
 	lua_pop(L, 1);
 
 	if (main_node_.empty())
@@ -58,7 +58,7 @@ bool Scheduler::Create(size_t worker_count, const char* main_node)
 		workers_.push_back(worker);
 	}
 
-	main_node_id_ = SpawnNode(main_node);
+	main_node_id_ = SpawnNode(main_node_);
 	if (main_node_id_ == 0)
 	{
 		lua_close(L);

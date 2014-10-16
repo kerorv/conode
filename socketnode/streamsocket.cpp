@@ -1,3 +1,4 @@
+#include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -8,8 +9,9 @@ StreamSocket::StreamSocket(int fd, SocketServer* server)
 	: fd_(fd)
 	, server_(server)
 	, poll_write_(false)
+	, has_send_(0)
 	, msglen_(0)
-	, haslen_(0)
+	, has_read_(0)
 	, rstatus_(StatusReadHeader)
 {
 	id_ = server_->SpawnId();
@@ -29,24 +31,29 @@ void StreamSocket::Close()
 	}
 }
 
-void StreamSocket::SendMsg(const char* msg, int length)
+void StreamSocket::SendMsg(int msgtype, const char* msg, int length)
 {
-	if (length > UINT16_MAX)
+	if (msgtype > UINT16_MAX || length + sizeof(uint16_t) > UINT16_MAX)
 	{
 		// log
 		// TODO
 		return;
 	}
 
-	OutMsg outmsg;
-	outmsg.len = length;
-	outmsg.data = msg;
-	outmsg.send_bytes = 0;
-	outmsg.status = StatusSendHeader;
-	outmsgs_.push_back(outmsg);
-
 	// out message list limit
 	// TODO
+
+	NetMsg* nmsg = (NetMsg*)malloc(sizeof(NetMsg) + length);
+	nmsg->size = sizeof(uint16_t) + length;
+	nmsg->type = (uint16_t)msgtype;
+	memcpy(nmsg->content, msg, length);
+	outmsgs_.push_back(nmsg);
+//	OutMsg outmsg;
+//	outmsg.len = length;
+//	outmsg.data = msg;
+//	outmsg.send_bytes = 0;
+//	outmsg.status = StatusSendHeader;
+//	outmsgs_.push_back(outmsg);
 
 	if (SendList() == -1)
 	{
@@ -142,17 +149,17 @@ void StreamSocket::OnWrite()
 
 int StreamSocket::ReadHeader()
 {
-	char* buff = (char*)&msglen_ + haslen_;
-	int size = sizeof(uint16_t) - haslen_;
+	char* buff = (char*)&msglen_ + has_read_;
+	int size = sizeof(uint16_t) - has_read_;
 
 	int len = ReadBlock(buff, size);
 	if (len > 0)
 	{
-		haslen_ += len;
-		if (haslen_ == sizeof(uint16_t))
+		has_read_ += len;
+		if (has_read_ == sizeof(uint16_t))
 		{
 			msgbody_ = (char*)malloc(msglen_);
-			haslen_ = 0;
+			has_read_ = 0;
 			rstatus_ = StatusReadBody;
 		}
 	}
@@ -162,20 +169,20 @@ int StreamSocket::ReadHeader()
 
 int StreamSocket::ReadBody()
 {
-	char* buff = msgbody_ + haslen_;
-	int size = msglen_ - haslen_;
+	char* buff = msgbody_ + has_read_;
+	int size = msglen_ - has_read_;
 
 	int len = ReadBlock(buff, size);
 	if (len > 0)
 	{
-		haslen_ += len;
-		if (msglen_ == haslen_)
+		has_read_ += len;
+		if (msglen_ == has_read_)
 		{
 			server_->OnClientMsg(msgbody_, msglen_);
 
 			msgbody_ = NULL;
 			msglen_ = 0;
-			haslen_ = 0;
+			has_read_ = 0;
 			rstatus_ = StatusReadHeader;
 		}
 	}
@@ -220,76 +227,28 @@ int StreamSocket::SendList()
 	for (OutMsgList::iterator it = outmsgs_.begin();
 			it != outmsgs_.end(); )
 	{
-		OutMsg& msg = *it;
-		for (;msg.status != StatusSendOk;)
-		{
-			switch (msg.status)
-			{
-				case StatusSendHeader:
-					{
-						int ret = SendHeader(msg);
-						if (ret <= 0)
-							return ret;
-					}
-					break;
-				case StatusSendBody:
-					{
-						int ret = SendBody(msg);
-						if (ret <= 0)
-							return ret;
-					}
-					break;
-				default:
-					return -1;
-					break;
-			}
-		}
+		NetMsg* msg = *it;
 
-		if (msg.status == StatusSendOk)
+		for (;;)
 		{
-			free(const_cast<char*>(msg.data));
-			it = outmsgs_.erase(it);
+			const char* buff = (const char*)msg + has_send_;
+			int size = msg->size + 2/*LENGTH field's len*/ - has_send_;
+			int ret = SendBlock(buff, size);
+			if (ret <= 0)
+				return ret;
+
+			has_send_ += ret;
+			if (has_send_ == msg->size + 2)
+			{
+				has_send_ = 0;
+				free(msg);
+				it = outmsgs_.erase(it);
+				break;
+			}
 		}
 	}
 
 	return 1;
-}
-
-int StreamSocket::SendHeader(OutMsg& msg)
-{
-	const char* buff = (const char*)&msg.len + msg.send_bytes;
-	int size = sizeof(uint16_t) - msg.send_bytes;
-
-	int len = SendBlock(buff, size);
-	if (len > 0)
-	{
-		msg.send_bytes += len;
-		if (msg.send_bytes == sizeof(uint16_t))
-		{
-			msg.send_bytes = 0;
-			msg.status = StatusSendBody;
-		}
-	}
-
-	return len;
-}
-
-int StreamSocket::SendBody(OutMsg& msg)
-{
-	const char* buff = msg.data + msg.send_bytes;
-	int size = msg.len - msg.send_bytes;
-
-	int len = SendBlock(buff, size);
-	if (len > 0)
-	{
-		msg.send_bytes += len;
-		if (msg.len == msg.send_bytes)
-		{
-			msg.status = StatusSendOk;
-		}
-	}
-
-	return len;
 }
 
 // return

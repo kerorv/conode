@@ -6,15 +6,8 @@
 
 int main(int argc, char* argv[])
 {
-	if (argc < 2)
-	{
-		printf("Usage: conode main_node_name\n");
-		return -1;
-	}
-
-	const char* main_node = argv[1];
 	Scheduler* sched = Scheduler::GetInstance();
-	if (!sched->Create(WORKER_COUNT, main_node))
+	if (!sched->Create())
 	{
 		printf("scheduler create fail!\n");
 		return -1;

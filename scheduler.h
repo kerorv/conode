@@ -15,7 +15,7 @@ class Scheduler : public MsgRouter
 public:
 	static Scheduler* GetInstance();
 
-	bool Create(size_t worker_count, const char* main_node);
+	bool Create();
 	void Close();
 
 	unsigned int SpawnNode(const std::string& node_name);

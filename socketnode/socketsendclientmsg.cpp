@@ -27,6 +27,11 @@ bool SocketSendClientMsg::GetIntegerField(const char* name, int index, int64_t& 
 		value = sid_;
 		return true;
 	}
+	else if (strcmp(name, "msgtype") == 0)
+	{
+		value = msgtype_;
+		return true;
+	}
 
 	return false;
 }
@@ -47,6 +52,11 @@ bool SocketSendClientMsg::SetIntegerField(const char* name, int index, int64_t v
 	if (strcmp(name, "sid") == 0)
 	{
 		sid_ = (int)value;
+		return true;
+	}
+	else if (strcmp(name, "msgtype") == 0)
+	{
+		msgtype_ = (int)value;
 		return true;
 	}
 

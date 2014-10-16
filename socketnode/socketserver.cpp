@@ -239,7 +239,7 @@ void SocketServer::OnNodeMsg(const Message& msg)
 				int outmsglen = 0;
 				const char* outmsg = real_msg.MoveMsg(outmsglen);
 				if (outmsg && outmsglen > 0)
-					ss->SendMsg(outmsg, outmsglen);
+					ss->SendMsg(real_msg.GetMsgType(), outmsg, outmsglen);
 			}
 			break;
 		case MSG_TYPE_SOCKET_KICKOFFCONNECTION:

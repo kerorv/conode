@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <list>
+#include "message.h"
 #include "eventhandler.h"
 
 class SocketServer;
@@ -12,7 +13,7 @@ public:
 	virtual ~StreamSocket();
 
 	void Close();
-	void SendMsg(const char* msg, int len);
+	void SendMsg(int msgtype, const char* msg, int len);
 	bool IsActive() { return (fd_ != -1); }
 	int GetId() const { return id_; }
 
@@ -29,37 +30,23 @@ private:
 	int ReadBlock(char* block, size_t size);
 
 	int SendList();
-	struct OutMsg;
-	int SendHeader(OutMsg& msg);
-	int SendBody(OutMsg& msg);
 	int SendBlock(const char* block, int size);
 
 private:
 	int fd_;
 	int id_;
 	SocketServer* server_;
+
 	// write operation
-	enum SendStatus
-	{
-		StatusSendHeader,
-		StatusSendBody,
-		StatusSendOk,
-	};
-	struct OutMsg
-	{
-		uint16_t len;
-		const char* data;
-		int send_bytes;
-		SendStatus status;
-	};
-	typedef std::list<OutMsg> OutMsgList;
+	typedef std::list<NetMsg*> OutMsgList;
 	OutMsgList outmsgs_;
 	bool poll_write_;
+	int has_send_;
 
 	// read operation
 	uint16_t msglen_;
 	char* msgbody_;
-	int haslen_;
+	int has_read_;
 	enum ReadStatus
 	{
 		StatusReadHeader,

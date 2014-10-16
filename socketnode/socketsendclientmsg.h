@@ -16,6 +16,7 @@ public:
 			const char* value, int len);
 
 	int GetSid() const { return sid_; }
+	int GetMsgType() const { return msgtype_; }
 	const char* MoveMsg(int& len) {
 		const char* tmp = msg_;
 		len = msglen_;
@@ -26,6 +27,7 @@ public:
 
 private:
 	int sid_;
+	int msgtype_;
 	char* msg_;
 	int msglen_;
 };
