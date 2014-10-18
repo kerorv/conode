@@ -29,6 +29,14 @@ void StreamSocket::Close()
 		close(fd_);
 		fd_ = -1;
 	}
+
+	for (OutMsgList::iterator it = outmsgs_.begin();
+			it != outmsgs_.end(); )
+	{
+		NetMsg* nmsg = *it;
+		free(nmsg);
+	}
+	outmsgs_.clear();
 }
 
 void StreamSocket::SendMsg(int msgtype, const char* msg, int length)
@@ -48,12 +56,6 @@ void StreamSocket::SendMsg(int msgtype, const char* msg, int length)
 	nmsg->type = (uint16_t)msgtype;
 	memcpy(nmsg->content, msg, length);
 	outmsgs_.push_back(nmsg);
-//	OutMsg outmsg;
-//	outmsg.len = length;
-//	outmsg.data = msg;
-//	outmsg.send_bytes = 0;
-//	outmsg.status = StatusSendHeader;
-//	outmsgs_.push_back(outmsg);
 
 	if (SendList() == -1)
 	{
@@ -158,6 +160,9 @@ int StreamSocket::ReadHeader()
 		has_read_ += len;
 		if (has_read_ == sizeof(uint16_t))
 		{
+			if (msglen_ < sizeof(uint16_t))	// must >= 2(at least has TYPE field)
+				return -1;
+
 			msgbody_ = (char*)malloc(msglen_);
 			has_read_ = 0;
 			rstatus_ = StatusReadBody;
@@ -178,8 +183,11 @@ int StreamSocket::ReadBody()
 		has_read_ += len;
 		if (msglen_ == has_read_)
 		{
-			server_->OnClientMsg(msgbody_, msglen_);
+			uint16_t msgtype = *((uint16_t*)msgbody_);
+			server_->OnClientMsg(this, msgtype, msgbody_ + sizeof(uint16_t), 
+					msglen_ - sizeof(uint16_t));
 
+			free(msgbody_);
 			msgbody_ = NULL;
 			msglen_ = 0;
 			has_read_ = 0;

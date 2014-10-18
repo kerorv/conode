@@ -10,7 +10,7 @@ public:
 
 	virtual std::string GetMessageName()
 	{
-		return "loginmsg";
+		return "LoginMsg";
 	}
 
 	virtual const char* GetStringField(const char* name, int index, int& len)

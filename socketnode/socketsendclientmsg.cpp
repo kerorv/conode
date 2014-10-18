@@ -17,34 +17,7 @@ SocketSendClientMsg::~SocketSendClientMsg()
 
 std::string SocketSendClientMsg::GetMessageName()
 {
-	return "socketsendclientmsg";
-}
-
-bool SocketSendClientMsg::GetIntegerField(const char* name, int index, int64_t& value)
-{
-	if (strcmp(name, "sid") == 0)
-	{
-		value = sid_;
-		return true;
-	}
-	else if (strcmp(name, "msgtype") == 0)
-	{
-		value = msgtype_;
-		return true;
-	}
-
-	return false;
-}
-
-const char* SocketSendClientMsg::GetStringField(const char* name, int index, int& len)
-{
-	if (strcmp(name, "msg") == 0)
-	{
-		len = msglen_;
-		return msg_;
-	}
-
-	return NULL;
+	return "SocketSendClientMsg";
 }
 
 bool SocketSendClientMsg::SetIntegerField(const char* name, int index, int64_t value)

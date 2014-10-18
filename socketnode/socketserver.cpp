@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <sys/epoll.h>
 #include "socketsendclientmsg.h"
+#include "socketrecvclientmsg.h"
 #include "socketconnectionbreakmsg.h"
 #include "socketkickoffconnectionmsg.h"
 #include "socketremoveconnectionmsg.h"
@@ -14,6 +15,7 @@
 
 #define DEFAULT_LISTEN_PORT		8021
 #define POLL_INTERVAL			10	// ms
+#define ENCBUFFER_SIZE			0x10000 // 64K
 
 SocketServer::SocketServer()
 	: maxid_(0)
@@ -21,13 +23,18 @@ SocketServer::SocketServer()
 	, nid_(0)
 	, router_(nullptr)
 	, thread_(nullptr)
-	, sp_(nullptr)
+	, encbuf_(nullptr)
 {
+	encbuf_ = (char*)malloc(ENCBUFFER_SIZE);
 }
 
 SocketServer::~SocketServer()
 {
 	Close();
+	if (encbuf_)
+	{
+		free(encbuf_);
+	}
 }
 
 int SocketServer::ParseConfig(const char* config)
@@ -57,8 +64,7 @@ bool SocketServer::Create(unsigned int id, MsgRouter* router,
 
 	poller_.RegisteHandler(&listener_, EventRead);
 	
-	sp_ = LoadSproto();
-	if (sp_ == nullptr)
+	if (!LoadSproto())
 		return false;
 
 	nid_ = id;
@@ -81,11 +87,6 @@ void SocketServer::Close()
 
 	poller_.Close();
 	listener_.Close();
-	if (sp_)
-	{
-		delete sp_;
-		sp_ = nullptr;
-	}
 }
 
 void SocketServer::OnMessage(const Message& msg)
@@ -117,6 +118,7 @@ void SocketServer::Run()
 		{
 			const Message& msg = *it;
 			OnNodeMsg(msg);
+			free(msg.content);
 		}
 		sendmsgs.clear();
 	}
@@ -151,7 +153,7 @@ void SocketServer::AddSocket(StreamSocket* ss)
 
 void SocketServer::CloseSocket(StreamSocket* ss, int reason)
 {
-	if (ss == NULL)
+	if (ss == nullptr)
 		return;
 
 	ss->Close();
@@ -161,14 +163,15 @@ void SocketServer::CloseSocket(StreamSocket* ss, int reason)
 	SocketConnectionBreakMsg cbmsg;
 	cbmsg.SetSid(ss->GetId());
 	cbmsg.SetReason(reason);
-	int cbmsg_len = sp_->Encode(&cbmsg);
-	if (cbmsg_len == -1)
+	int size = ENCBUFFER_SIZE;
+	if (!sp_.Encode(&cbmsg, encbuf_, size))
 		return;
+
 	Message msg;
 	msg.type = MSG_TYPE_SOCKET_CONNECTIONBREAK;
-	msg.size = cbmsg_len;
-	msg.content = (char*)malloc(cbmsg_len);
-	memcpy(msg.content, sp_->GetEncodedBuffer(), cbmsg_len);
+	msg.size = size;
+	msg.content = (char*)malloc(size);
+	memcpy(msg.content, encbuf_, size);
 	msg.to = 1;	// scheduler
 	router_->SendMsg(msg);
 }
@@ -209,15 +212,25 @@ StreamSocket* SocketServer::FindConnection(int sid)
 	return it->second;
 }
 
-void SocketServer::OnClientMsg(char* msg, int len)
+void SocketServer::OnClientMsg(StreamSocket* ss, int msgtype, char* msg, 
+		int len)
 {
 	if (router_ == nullptr)
 		return;
 
+	SocketRecvClientMsg real_msg;
+	real_msg.SetSid(ss->GetId());
+	real_msg.SetMsgType(msgtype);
+	real_msg.SetMsg(msg, len);
+	int size = ENCBUFFER_SIZE;
+	if (!sp_.Encode(&real_msg, encbuf_, size))
+		return;
+
 	Message inmsg;
 	inmsg.type = MSG_TYPE_SOCKET_RECVCLIENTMSG;
-	inmsg.size = len;
-	inmsg.content = msg;
+	inmsg.size = size;
+	inmsg.content = (char*)malloc(size);
+	memcpy(inmsg.content, encbuf_, size);
 	inmsg.to = 1;	// scheduler
 	router_->SendMsg(inmsg);
 }
@@ -229,7 +242,7 @@ void SocketServer::OnNodeMsg(const Message& msg)
 		case MSG_TYPE_SOCKET_SENDCLIENTMSG:
 			{
 				SocketSendClientMsg real_msg;
-				if (!sp_->Decode(&real_msg, msg.content, msg.size))
+				if (!sp_.Decode(&real_msg, msg.content, msg.size))
 					return;
 
 				StreamSocket* ss = FindConnection(real_msg.GetSid());
@@ -245,7 +258,7 @@ void SocketServer::OnNodeMsg(const Message& msg)
 		case MSG_TYPE_SOCKET_KICKOFFCONNECTION:
 			{
 				SocketKickoffConnectionMsg real_msg;
-				if (!sp_->Decode(&real_msg, msg.content, msg.size))
+				if (!sp_.Decode(&real_msg, msg.content, msg.size))
 					return;
 
 				StreamSocket* ss = FindConnection(real_msg.GetSid());
@@ -258,7 +271,7 @@ void SocketServer::OnNodeMsg(const Message& msg)
 		case MSG_TYPE_SOCKET_REMOVECONNECTION:
 			{
 				SocketRemoveConnectionMsg real_msg;
-				if (!sp_->Decode(&real_msg, msg.content, msg.size))
+				if (!sp_.Decode(&real_msg, msg.content, msg.size))
 					return;
 
 				RemoveSocket(real_msg.GetSid());
@@ -269,11 +282,11 @@ void SocketServer::OnNodeMsg(const Message& msg)
 	}
 }
 
-CppSproto* SocketServer::LoadSproto()
+bool SocketServer::LoadSproto()
 {
 	std::ifstream ifs("proto/socketnode.pb", std::ifstream::binary);
 	if (!ifs)
-		return nullptr;
+		return false;
 
 	ifs.seekg(0, ifs.end);
 	int length = ifs.tellg();
@@ -285,7 +298,6 @@ CppSproto* SocketServer::LoadSproto()
 	ifs.read(begin, length);
 	ifs.close();
 
-	CppSproto* sp = new CppSproto(pb.c_str(), pb.size());
-	return sp;
+	return sp_.Init(pb.data(), pb.size());
 }
 

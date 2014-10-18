@@ -42,12 +42,12 @@ protected:
 	void RemoveSocket(int id);
 	void UpdateSocketWriteEvent(StreamSocket* ss, bool add);
 
-	void OnClientMsg(char* msg, int len);
+	void OnClientMsg(StreamSocket* ss, int msgtype, char* msg, int len);
 	void OnNodeMsg(const Message& msg);
 
 	StreamSocket* FindConnection(int sid);
 	int ParseConfig(const char* config);
-	CppSproto* LoadSproto();
+	bool LoadSproto();
 
 private:
 	ListenSocket listener_;
@@ -64,6 +64,7 @@ private:
 	typedef std::deque<Message> MsgQueue;
 	MsgQueue msgq_;
 	std::mutex msg_mutex_;
-	CppSproto* sp_;
+	CppSproto sp_;
+	char* encbuf_;
 };
 

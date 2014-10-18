@@ -18,11 +18,11 @@ struct NetMsg
 
 #define MSG_TYPE_PLAYER_LOGIN	1001
 
-CppSproto* LoadSproto()
+bool LoadSproto(CppSproto& sp)
 {
 	std::ifstream ifs("proto/client.pb", std::ifstream::binary);
 	if (!ifs)
-		return nullptr;
+		return false;
 	
 	ifs.seekg(0, ifs.end);
 	int length = ifs.tellg();
@@ -34,14 +34,13 @@ CppSproto* LoadSproto()
 	ifs.read(begin, length);
 	ifs.close();
 		
-	CppSproto* sp = new CppSproto(pb.c_str(), pb.size());
-	return sp;
+	return sp.Init(pb.data(), pb.size());
 }
 
 int main(int argc, char* argv[])
 {
-	CppSproto* sp = LoadSproto();
-	if (sp == nullptr)
+	CppSproto sp;
+	if (!LoadSproto(sp))
 	{
 		printf("load sproto fail.\n");
 		return -1;
@@ -83,16 +82,22 @@ int main(int argc, char* argv[])
 		}
 		else if (cmd == 's')
 		{
+			static char buffer[1024];
 			LoginMsg msg;
 			msg.SetUsername("abc");
 			msg.SetPassword("123");
-			int len = sp->Encode(&msg);
+			int len = sizeof(buffer);
+			if (!sp.Encode(&msg, buffer, len))
+			{
+				printf("encode fail\n");
+				continue;
+			}
 			
 			int total_size = sizeof(NetMsg) + len;
 			NetMsg* nmsg = (NetMsg*)malloc(total_size);
 			nmsg->size = total_size - 2;
 			nmsg->type = MSG_TYPE_PLAYER_LOGIN;
-			memcpy(nmsg->content, sp->GetEncodedBuffer(), len);
+			memcpy(nmsg->content, buffer, len);
 
 			int send_bytes = 0;
 			for (;;)
@@ -118,7 +123,6 @@ int main(int argc, char* argv[])
 	}
 
 	close(fd);
-	delete sp;
 	return 0;
 }
 

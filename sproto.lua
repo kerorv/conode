@@ -1,3 +1,4 @@
+package.cpath = package.cpath .. ";./lib/lib?.so"
 local core = require "sproto.core"
 local assert = assert
 
@@ -56,6 +57,11 @@ end
 function sproto:decode(typename, bin)
 	local st = querytype(self, typename)
 	return core.decode(st, bin)
+end
+
+function sproto:decodeud(typename, ud, len)
+	local st = querytype(self, typename)
+	return core.decode(st, ud, len)
 end
 
 function sproto:pencode(typename, tbl)
