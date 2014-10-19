@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 #include <fstream>
 #include <unistd.h>
 #include <sys/types.h>
@@ -8,6 +9,7 @@
 #include <arpa/inet.h>
 #include "cppsproto.h"
 #include "loginmsg.h"
+#include "echomsg.h"
 
 struct NetMsg
 {
@@ -16,6 +18,7 @@ struct NetMsg
 	char content[];
 };
 
+#define MSG_TYPE_ECHO			1000
 #define MSG_TYPE_PLAYER_LOGIN	1001
 
 bool LoadSproto(CppSproto& sp)
@@ -72,20 +75,40 @@ int main(int argc, char* argv[])
 		}
 		else if (cmd == 'r')
 		{
-			int len = recv(fd, buffer, 1024, 0);
-			printf("recv %d bytes:", len);
-			for (int i = 0; i < len; ++i)
+			NetMsg* msg = (NetMsg*)buffer;
+			int ret = recv(fd, buffer, sizeof(uint16_t), 0);
+			assert(ret == sizeof(uint16_t));
+			assert(msg->size <= sizeof(buffer));
+			ret = recv(fd, buffer + sizeof(uint16_t), msg->size, 0);
+			assert(ret == msg->size);
+
+			switch (msg->type)
 			{
-				printf("%c", buffer[i]);
+				case MSG_TYPE_ECHO:
+					{
+						EchoMsg echomsg;
+						if (!sp.Decode(
+									&echomsg, 
+									msg->content, 
+									msg->size - sizeof(uint16_t)))
+							break;
+
+						printf("Recv EchoMsg: %s\n", echomsg.GetMsg().c_str());
+					}
+					break;
+				default:
+					break;
 			}
-			printf("\n");
 		}
 		else if (cmd == 's')
 		{
-			static char buffer[1024];
+			/*
 			LoginMsg msg;
 			msg.SetUsername("abc");
 			msg.SetPassword("123");
+			*/
+			EchoMsg msg;
+			msg.SetMsg("hello conode");
 			int len = sizeof(buffer);
 			if (!sp.Encode(&msg, buffer, len))
 			{
@@ -96,7 +119,7 @@ int main(int argc, char* argv[])
 			int total_size = sizeof(NetMsg) + len;
 			NetMsg* nmsg = (NetMsg*)malloc(total_size);
 			nmsg->size = total_size - 2;
-			nmsg->type = MSG_TYPE_PLAYER_LOGIN;
+			nmsg->type = MSG_TYPE_ECHO; // MSG_TYPE_PLAYER_LOGIN;
 			memcpy(nmsg->content, buffer, len);
 
 			int send_bytes = 0;

@@ -50,20 +50,44 @@ function MainNode:Release()
 	print("MainNode:Release()")
 end
 
-function MainNode:OnClientMsg(msgtype, msg)
-	if (msgtype == MSG_TYPE_PLAYER_LOGIN) then
+function MainNode:SendClientMsg(sid, msgtype, msg)
+	local clientmsg = { sid = sid, msgtype = msgtype, msg = msg }
+	local spmsg = self.sp:encode("SocketSendClientMsg", clientmsg)
+	sendmsg(100--[[socketnode id]], MSG_TYPE_SOCKET_SENDCLIENTMSG, spmsg)
+end
+
+function MainNode:OnClientMsg(sid, msgtype, msg)
+	if msgtype == MSG_TYPE_PLAYER_LOGIN then
 		local loginmsg = self.sp:decode("LoginMsg", msg)
 		assert(loginmsg)
-		print("LoginMsg username=" .. loginmsg.username .." password=" .. loginmsg.password)
+		print("LoginMsg from sid=" .. sid .. 
+				" username=" .. loginmsg.username ..
+				" password=" .. loginmsg.password)
+	elseif msgtype == MSG_TYPE_ECHO then
+		local echomsg = self.sp:decode("EchoMsg", msg)
+		assert(echomsg)
+		print("EchoMsg from sid=" .. sid .. " msg=" .. echomsg.msg)
+		local response = { msg = echomsg.msg }
+		local respmsg = self.sp:encode("EchoMsg", response)
+		self:SendClientMsg(sid, MSG_TYPE_ECHO, respmsg)
 	end
 end
 
-function MainNode:OnMessage(tag, ptr, len)
-	if (tag == MSG_TYPE_SOCKET_RECVCLIENTMSG) then
-		print("MainNode:OnMessage: type=" .. tag .. " len=" .. len)
+function MainNode:OnMessage(type, ptr, len)
+	if type == MSG_TYPE_SOCKET_RECVCLIENTMSG then
 		local clientmsg = self.sp:decodeud("SocketRecvClientMsg", ptr, len)
 		assert(clientmsg)
-		self:OnClientMsg(clientmsg.msgtype, clientmsg.msg)
+		self:OnClientMsg(clientmsg.sid, clientmsg.msgtype, clientmsg.msg)
+	elseif type == MSG_TYPE_SOCKET_CONNECTIONBREAK then
+		local connbreakmsg = self.sp:decodeud(
+				"SocketConnectionBreakMsg",
+				ptr, 
+				len)	
+		assert(connbreakmsg)
+		print("Connection[" .. connbreakmsg.sid .. "] is broken. reason:" .. connbreakmsg.reason)
+		local rmconnmsg = { sid = connbreakmsg.sid }
+		local spmsg = self.sp:encode("SocketRemoveConnectionMsg", rmconnmsg)
+		sendmsg(100--[[socketnode id]], MSG_TYPE_SOCKET_REMOVECONNECTION, spmsg)
 	end
 end
 
