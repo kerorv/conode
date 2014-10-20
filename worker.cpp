@@ -71,6 +71,8 @@ void Worker::Destroy()
 		SendMsg(msgquit);
 
 		thread_->join();
+		delete thread_;
+		thread_ == nullptr;
 	}
 
 	for (LnodeMap::iterator it = nodes_.begin();
