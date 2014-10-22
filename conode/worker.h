@@ -21,7 +21,7 @@ public:
 	void Run();
 	void Destroy();
 
-	unsigned int SpawnNode(const std::string& name, const std::string& config);
+	unsigned int SpawnNode(const char* name, const char* config);
 	void CloseNode(unsigned int nid);
 	void SendMsg(const Message& msg);
 	unsigned int SetTimer(unsigned nid, int interval);
@@ -32,13 +32,18 @@ public:
 private:
 	void DispatchMsg(const Message& msg);
 	void ProcessMsg(const Message& msg);
-	void CreateNode(unsigned int nid, const std::string& srcfile, 
-		const std::string& class_name, const std::string& config);
+	void CreateNode(
+			unsigned int nid, 
+			const std::string& srcfile, 
+			const std::string& class_name, 
+			const char* config);
 	void DestroyNode(unsigned int nid);
 	void CreateTimer(unsigned int nid, unsigned int tid, int interval);
 	void DestroyTimer(unsigned int nid, unsigned int tid);
 	struct LuaNodeCache;
-	bool LoadLuaNode(const std::string& file, const std::string& node, 
+	bool LoadLuaNode(
+			const std::string& file, 
+			const std::string& node, 
 			Worker::LuaNodeCache& cache);
 
 private:

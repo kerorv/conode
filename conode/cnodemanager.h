@@ -26,21 +26,21 @@ public:
 	bool Create(MsgRouter* router);
 	void Destroy();
 	unsigned int SpawnNode(
-			const std::string& name, 
-			const std::string& config);
+			const char* name, 
+			const char* config);
 	void CloseNode(unsigned int id);
 	void SendMsg(const Message& msg);
 
 private:
 	void Run();
-	void DispatchMsg(const Message& msg);
+	void ProcessMsg(const Message& msg);
+	void RouteCnodeMsg(const Message& msg);
 
 	bool CreateCnode(
 			unsigned int id, 
-			const std::string& name,
-			const std::string& config);
+			const char* name,
+			const char* config);
 	void DestroyCnode(unsigned int id);
-	void RouteCnodeMsg(const Message& msg);
 
 private:
 	MsgRouter* router_;

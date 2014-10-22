@@ -15,16 +15,14 @@ Lnode::~Lnode()
 
 bool Lnode::Create(
 		lua_State* L,
-		const std::string& class_name, 
-		const std::string& config,
+		const char* config,
 		int refnew)
 {
 	ls_ = L;
-	name_ = class_name;
 
 	// call SomeLnode:New
 	// return node(it's a table) if ok
-	if (!CallNew(config.c_str(), refnew))
+	if (!CallNew(config, refnew))
 		return false;
 
 	// check return is a table

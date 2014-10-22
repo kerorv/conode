@@ -18,10 +18,8 @@ public:
 	bool Create(int worker_count, const char* mainnode);
 	void Close();
 
-	unsigned int SpawnNode(const std::string& name, const std::string& config);
+	unsigned int SpawnNode(const char* name, const char* config);
 	void CloseNode(unsigned int nid);
-	void* SpawnCnode(const std::string& name, const std::string& config);
-	void CloseCnode(void* ptr);
 	// MsgRouter implement
 	virtual void SendMsg(const Message& msg);
 	unsigned int SetTimer(unsigned int nid, int interval);

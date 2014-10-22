@@ -1,6 +1,5 @@
 #include <stdlib.h>
 #include <string.h>
-#include <string>
 #include "scheduler.h"
 #include "capi.h"
 
@@ -18,10 +17,8 @@ int C_SpawnNode(lua_State* L)
 		return 1;
 	}
 
-	const char* sz1 = luaL_checkstring(L, 1);
-	const char* sz2 = luaL_checkstring(L, 2);
-	std::string name(sz1);
-	std::string config(sz2);
+	const char* name = luaL_checkstring(L, 1);
+	const char* config = luaL_checkstring(L, 2);
 	unsigned int node_id = sched->SpawnNode(name, config);
 	lua_pushinteger(L, (int)node_id);
 	return 1;

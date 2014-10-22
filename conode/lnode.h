@@ -1,6 +1,5 @@
 #pragma once
 
-#include <string>
 #include <list>
 #include "lua.hpp"
 #include "message.h"
@@ -14,8 +13,7 @@ public:
 
 	bool Create(
 			lua_State* L, 
-			const std::string& class_name, 
-			const std::string& config, 
+			const char* config, 
 			int refnew);
 	void Destroy();
 	void ProcessMsg(const Message& msg);
@@ -35,7 +33,6 @@ private:
 private:
 	unsigned int id_;
 	lua_State* ls_;
-	std::string name_;
 	typedef std::list<Timer*> TimerList;
 	TimerList timers_;
 	int ref_;

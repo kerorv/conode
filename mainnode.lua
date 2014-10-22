@@ -1,6 +1,5 @@
 -- mainnode.lua
 
-local conode = require "conode"
 local sproto = require "sproto"
 local msgtypes = require "msgtype"
 
@@ -21,7 +20,7 @@ end
 local function sendclientmsg(node, sid, type, msg)
 	local clientmsg = { sid = sid, msgtype = type, msg = msg }
 	local spmsg = node.sp:encode("SocketSendClientMsg", clientmsg)
-	conode.sendmsg(100--[[socketnode id]], msgtypes.SOCKET_SENDCLIENTMSG, spmsg)
+	sendmsg(node.sknode, msgtypes.SOCKET_SENDCLIENTMSG, spmsg)
 end
 
 local function onclientmsg(node, sid, msgtype, msg)
@@ -62,7 +61,6 @@ end
 function MainNode:OnMessage(type, ptr, len)
 	if type == msgtypes.SOCKET_RECVCLIENTMSG then
 		local clientmsg = self.sp:decodeud("SocketRecvClientMsg", ptr, len)
-		print(clientmsg)
 		assert(clientmsg)
 		onclientmsg(self, clientmsg.sid, clientmsg.msgtype, clientmsg.msg)
 	elseif type == msgtypes.SOCKET_CONNECTIONBREAK then
@@ -76,7 +74,7 @@ function MainNode:OnMessage(type, ptr, len)
 				.. connbreakmsg.reason)
 		local rmconnmsg = { sid = connbreakmsg.sid }
 		local spmsg = self.sp:encode("SocketRemoveConnectionMsg", rmconnmsg)
-		conode.sendmsg(100--[[socketnode id]], msgtypes.SOCKET_REMOVECONNECTION, spmsg)
+		sendmsg(self.sknode, msgtypes.SOCKET_REMOVECONNECTION, spmsg)
 	end
 end
 

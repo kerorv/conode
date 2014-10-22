@@ -1,3 +1,4 @@
+#include <string.h>
 #include "lua.hpp"
 #include "capi.h"
 #include "worker.h"
@@ -73,28 +74,29 @@ void Scheduler::Close()
 }
 
 unsigned int Scheduler::SpawnNode(
-		const std::string& name, 
-		const std::string& config)
+		const char* name, 
+		const char* config)
 {
-	if (name.empty())
+	if (name == nullptr)
 		return 0;
 
-	if (name.length() > 3 && 
-		name.substr(name.length() - 3, 3) == ".so")
+	if (strlen(name) > 3)
 	{
-		// cnode
-		return cnodemgr_->SpawnNode(name, config);
+		const char* suffix = name + strlen(name) - 3;
+		if (strcmp(suffix, ".so") == 0)
+		{
+			// cnode
+			return cnodemgr_->SpawnNode(name, config);
+		}
 	}
-	else
-	{
-		// lnode
-		int worker_idx = NextWorkerIdx();
-		Worker* worker = workers_[worker_idx];
-		if (worker == nullptr)
-			return 0;
 
-		return worker->SpawnNode(name, config);
-	}
+	// lnode
+	int worker_idx = NextWorkerIdx();
+	Worker* worker = workers_[worker_idx];
+	if (worker == nullptr)
+		return 0;
+
+	return worker->SpawnNode(name, config);
 }
 
 void Scheduler::CloseNode(unsigned int nid)

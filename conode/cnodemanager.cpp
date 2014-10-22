@@ -72,15 +72,24 @@ void CnodeManager::Run()
 		Message msg;
 		if (msgs_.Take(msg, timeout))
 		{
-			DispatchMsg(msg);
-			free(msg.content);
+			if (msg.to == 1) // self
+			{
+				ProcessMsg(msg);
+				free(msg.content);
+			}
+			else // forwarding to cnode
+			{
+				RouteCnodeMsg(msg);
+				// Don't free msg.content
+				// cnode will free it
+			}
 		}
 	}
 }
 
 unsigned int CnodeManager::SpawnNode(
-		const std::string& name, 
-		const std::string& config)
+		const char* name, 
+		const char* config)
 {
 	unsigned int id = 0;
 
@@ -95,11 +104,11 @@ unsigned int CnodeManager::SpawnNode(
 		msg_create_node.size = sizeof(CreateNodeST);
 		CreateNodeST* ptr = (CreateNodeST*)malloc(sizeof(CreateNodeST));
 		ptr->id = id;
-		ptr->name = strdup(name.c_str());
-		if (config.empty())
+		ptr->name = strdup(name);
+		if (config == nullptr)
 			ptr->config = nullptr;
 		else
-			ptr->config = strdup(config.c_str());
+			ptr->config = strdup(config);
 		msg_create_node.content = (char*)ptr;
 		msg_create_node.to = 1;	// scheduler
 		SendMsg(msg_create_node);
@@ -125,7 +134,7 @@ void CnodeManager::SendMsg(const Message& msg)
 	msgs_.Add(msg);
 }
 
-void CnodeManager::DispatchMsg(const Message& msg)
+void CnodeManager::ProcessMsg(const Message& msg)
 {
 	switch (msg.type)
 	{
@@ -137,9 +146,7 @@ void CnodeManager::DispatchMsg(const Message& msg)
 		case MSG_TYPE_CNODEMGR_CREATENODE:
 			{
 			CreateNodeST* ptr = (CreateNodeST*)msg.content;
-			std::string name(ptr->name);
-			std::string config(ptr->config);
-			CreateCnode(ptr->id, name, config);
+			CreateCnode(ptr->id, ptr->name, ptr->config);
 			free(ptr->name);
 			free(ptr->config);
 			}
@@ -151,24 +158,21 @@ void CnodeManager::DispatchMsg(const Message& msg)
 			}
 			break;
 		default:
-			{
-			RouteCnodeMsg(msg);
-			}
 			break;
 	}
 }
 
 bool CnodeManager::CreateCnode(
 		unsigned int id, 
-		const std::string& name,
-		const std::string& config)
+		const char* name,
+		const char* config)
 {
 	CnodeModule* module = nullptr;
 	CnodeModuleMap::iterator it = cnode_modules_.find(name);
 	if (it == cnode_modules_.end())
 	{
 		CnodeModule* new_module = new CnodeModule;
-		if (!new_module->Load(name.c_str()))
+		if (!new_module->Load(name))
 		{
 			delete module;
 			return false;
@@ -185,7 +189,7 @@ bool CnodeManager::CreateCnode(
 	Cnode* node = module->CreateCnode();
 	if (node)
 	{
-		if (!node->Create(id, router_, config.c_str()))
+		if (!node->Create(id, router_, config))
 		{
 			module->ReleaseCnode(node);
 			return false;

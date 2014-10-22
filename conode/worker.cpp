@@ -133,12 +133,11 @@ void Worker::ProcessMsg(const Message& msg)
 			{
 			CreateNodeST* ptr = (CreateNodeST*)msg.content;
 			std::string class_name(ptr->name);
-			std::string config(ptr->config);
 			std::string file_name(class_name);
 			transform(class_name.begin(), class_name.end(), 
 					file_name.begin(), tolower);
 			file_name += ".lua";
-			CreateNode(ptr->id, file_name, class_name, config);
+			CreateNode(ptr->id, file_name, class_name, ptr->config);
 			free(ptr->name);
 			free(ptr->config);
 			}
@@ -167,8 +166,8 @@ void Worker::ProcessMsg(const Message& msg)
 }
 
 unsigned int Worker::SpawnNode(
-		const std::string& name, 
-		const std::string& config)
+		const char* name, 
+		const char* config)
 {
 	unsigned int nid = 0;
 
@@ -188,11 +187,11 @@ unsigned int Worker::SpawnNode(
 	msg_create_node.size = sizeof(CreateNodeST);
 	CreateNodeST* ptr = (CreateNodeST*)malloc(sizeof(CreateNodeST));
 	ptr->id = nid;
-	ptr->name = strdup(name.c_str());
-	if (config.empty())
+	ptr->name = strdup(name);
+	if (config == nullptr)
 		ptr->config = nullptr;
 	else
-		ptr->config = strdup(config.c_str());
+		ptr->config = strdup(config);
 	msg_create_node.content = (char*)ptr;
 	msg_create_node.to = id_;
 	SendMsg(msg_create_node);
@@ -291,7 +290,7 @@ void Worker::CreateNode(
 		unsigned int nid, 
 		const std::string& srcfile, 
 		const std::string& class_name,
-		const std::string& config)
+		const char* config)
 {
 	LuaNodeCache cache;
 	if (!LoadLuaNode(srcfile, class_name, cache))
@@ -301,7 +300,7 @@ void Worker::CreateNode(
 	}
 
 	Lnode* node = new Lnode(nid);
-	if (node->Create(ls_, class_name, config, cache.refnew))
+	if (node->Create(ls_, config, cache.refnew))
 	{
 		nodes_.insert(std::make_pair(nid, node));
 	}
