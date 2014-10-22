@@ -1,13 +1,13 @@
 #include <stdio.h>
 #include <string>
-#include "scheduler.h"
+#include "conode.h"
 
 #define WORKER_COUNT	2
 
 int main(int argc, char* argv[])
 {
-	Scheduler* sched = Scheduler::GetInstance();
-	if (!sched->Create())
+	void* handle = conode_start(WORKER_COUNT, "MainNode");
+	if (handle == NULL)
 	{
 		printf("scheduler create fail!\n");
 		return -1;
@@ -15,7 +15,7 @@ int main(int argc, char* argv[])
 	
 	getchar();
 
-	sched->Close();
+	conode_stop(handle);
 	return 0;
 }
 

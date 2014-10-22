@@ -17,11 +17,11 @@ public:
 	Worker(unsigned int id);
 	~Worker();
 
-	bool Create();
+	bool Create(void* sched);
 	void Run();
 	void Destroy();
 
-	unsigned int SpawnNode(const std::string& node_name);
+	unsigned int SpawnNode(const std::string& name, const std::string& config);
 	void CloseNode(unsigned int nid);
 	void SendMsg(const Message& msg);
 	unsigned int SetTimer(unsigned nid, int interval);
@@ -33,7 +33,7 @@ private:
 	void DispatchMsg(const Message& msg);
 	void ProcessMsg(const Message& msg);
 	void CreateNode(unsigned int nid, const std::string& srcfile, 
-		const std::string& class_name);
+		const std::string& class_name, const std::string& config);
 	void DestroyNode(unsigned int nid);
 	void CreateTimer(unsigned int nid, unsigned int tid, int interval);
 	void DestroyTimer(unsigned int nid, unsigned int tid);

@@ -13,13 +13,18 @@ Lnode::~Lnode()
 {
 }
 
-bool Lnode::Create(lua_State* L,	const std::string& class_name, int refnew)
+bool Lnode::Create(
+		lua_State* L,
+		const std::string& class_name, 
+		const std::string& config,
+		int refnew)
 {
 	ls_ = L;
 	name_ = class_name;
 
 	// call SomeLnode:New
-	if (!CallNew(refnew))
+	// return node(it's a table) if ok
+	if (!CallNew(config.c_str(), refnew))
 		return false;
 
 	// check return is a table
@@ -29,7 +34,7 @@ bool Lnode::Create(lua_State* L,	const std::string& class_name, int refnew)
 		return false;
 	}
 	
-	// make reference of entity
+	// make reference of node then pop the node
 	int ref = luaL_ref(L, LUA_REGISTRYINDEX);
 	if (ref == LUA_REFNIL || ref == LUA_NOREF)
 		return false;
@@ -94,14 +99,15 @@ void Lnode::RemoveTimer(unsigned int tid)
 	}
 }
 
-bool Lnode::CallNew(int ref)
+bool Lnode::CallNew(const char* config, int ref)
 {
 	if (ref == LUA_NOREF || ref == LUA_REFNIL)
 		return false;
 
 	lua_rawgeti(ls_, LUA_REGISTRYINDEX, ref);
 	lua_pushinteger(ls_, id_);
-	if (lua_pcall(ls_, 1, 1, 0) != LUA_OK)
+	lua_pushstring(ls_, config);
+	if (lua_pcall(ls_, 2, 1, 0) != LUA_OK)
 	{
 		// TODO
 		// const char* err = lua_tostring(ls_, -1);

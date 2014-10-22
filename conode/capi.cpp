@@ -7,14 +7,23 @@
 int C_SpawnNode(lua_State* L)
 {
 	// lua code:
-	// node_id = spawnnode(entity)	-- entity is a string which is the classname 
-	//								-- of node's subclass
-	//								-- return node id
-	const char* sz = luaL_checkstring(L, 1);
-	std::string name(sz);
-	unsigned int node_id = Scheduler::GetInstance()->SpawnNode(name);
-	lua_pushinteger(L, (int)node_id);
+	// node_id = spawnnode(name, config)
+	// -- name is node's name
+	// -- config is node's param(can be nil)
+	// -- return node id
+	Scheduler* sched = (Scheduler*)lua_touserdata(L, lua_upvalueindex(1));
+	if (sched == nullptr)
+	{
+		lua_pushinteger(L, 0);
+		return 1;
+	}
 
+	const char* sz1 = luaL_checkstring(L, 1);
+	const char* sz2 = luaL_checkstring(L, 2);
+	std::string name(sz1);
+	std::string config(sz2);
+	unsigned int node_id = sched->SpawnNode(name, config);
+	lua_pushinteger(L, (int)node_id);
 	return 1;
 }
 
@@ -22,8 +31,12 @@ int C_CloseNode(lua_State* L)
 {
 	// lua code:
 	// closenode(node_id)
+	Scheduler* sched = (Scheduler*)lua_touserdata(L, lua_upvalueindex(1));
+	if (sched == nullptr)
+		return 0;
+
 	unsigned int node_id = (unsigned int)luaL_checkint(L, 1);
-	Scheduler::GetInstance()->CloseNode(node_id);
+	sched->CloseNode(node_id);
 	return 0;
 }
 
@@ -31,6 +44,10 @@ int C_SendMsg(lua_State* L)
 {
 	// lua code:
 	// sendmsg(node_id, type, content)
+	Scheduler* sched = (Scheduler*)lua_touserdata(L, lua_upvalueindex(1));
+	if (sched == nullptr)
+		return 0;
+
 	unsigned int node_id = (unsigned int)luaL_checkint(L, 1);
 	int type = luaL_checkint(L, 2);
 	size_t len = 0;
@@ -42,8 +59,7 @@ int C_SendMsg(lua_State* L)
 	msg.content = (char*)malloc(len);
 	memcpy(msg.content, content, len);
 	msg.to = node_id;
-
-	Scheduler::GetInstance()->SendMsg(msg);
+	sched->SendMsg(msg);
 	return 0;
 }
 
@@ -51,9 +67,16 @@ int C_SetTimer(lua_State* L)
 {
 	// lua code:
 	// timer_id = settimer(node_id, interval)
+	Scheduler* sched = (Scheduler*)lua_touserdata(L, lua_upvalueindex(1));
+	if (sched == nullptr)
+	{
+		lua_pushinteger(L, 0);
+		return 1;
+	}
+
 	unsigned int nid = (unsigned int)luaL_checkint(L, 1);
 	int interval = luaL_checkint(L, 2);
-	unsigned int timer_id = Scheduler::GetInstance()->SetTimer(nid, interval);
+	unsigned int timer_id = sched->SetTimer(nid, interval);
 	lua_pushinteger(L, (int)timer_id);
 	return 1;
 }
@@ -62,9 +85,13 @@ int C_KillTimer(lua_State* L)
 {
 	// lua code:
 	// killtimer(node_id, timer_id)
+	Scheduler* sched = (Scheduler*)lua_touserdata(L, lua_upvalueindex(1));
+	if (sched == nullptr)
+		return 0;
+
 	unsigned int nid = (unsigned int)luaL_checkint(L, 1);
 	unsigned int tid = luaL_checkint(L, 2);
-	Scheduler::GetInstance()->KillTimer(nid, tid);
+	sched->KillTimer(nid, tid);
 	return 0;
 }
 

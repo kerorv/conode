@@ -12,7 +12,11 @@ public:
 	Lnode(unsigned int id);
 	~Lnode();
 
-	bool Create(lua_State* L, const std::string& class_name, int refnew);
+	bool Create(
+			lua_State* L, 
+			const std::string& class_name, 
+			const std::string& config, 
+			int refnew);
 	void Destroy();
 	void ProcessMsg(const Message& msg);
 	void OnTimer(unsigned int tid);
@@ -23,7 +27,7 @@ public:
 	unsigned int GetId() const { return id_; }
 
 private:
-	bool CallNew(int ref);
+	bool CallNew(const char* config, int ref);
 	void CallRelease();
 	void CallOnMessage(const Message& msg);
 	void CallOnTimer(unsigned int tid);

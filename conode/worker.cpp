@@ -4,6 +4,7 @@
 #include <vector>
 #include <functional>
 #include <algorithm>
+#include "msgdefine.h"
 #include "capi.h"
 #include "lnode.h"
 #include "worker.h"
@@ -15,7 +16,7 @@ Worker::Worker(unsigned int id)
 	, ls_(nullptr)
 	, thread_(nullptr)
 	, quit_(false)
-	, nids_(id, MAX_NODE_COUNT)
+	, nids_(id + 1, MAX_NODE_COUNT)
 {
 }
 
@@ -23,7 +24,18 @@ Worker::~Worker()
 {
 }
 
-bool Worker::Create()
+static void RegisterFunction(
+		lua_State* L, 
+		const char* name,
+		lua_CFunction fn, 
+		void* sched)
+{
+	lua_pushlightuserdata(L, sched);
+	lua_pushcclosure(L, fn, 1);
+	lua_setglobal(L, name);
+}
+
+bool Worker::Create(void* sched)
 {
 	ls_ = luaL_newstate();
 	if (ls_ == nullptr)
@@ -31,11 +43,11 @@ bool Worker::Create()
 
 	luaL_openlibs(ls_);
 
-	lua_register(ls_, "spawnnode", C_SpawnNode);
-	lua_register(ls_, "closenode", C_CloseNode);
-	lua_register(ls_, "sendmsg", C_SendMsg);
-	lua_register(ls_, "settimer", C_SetTimer);
-	lua_register(ls_, "killtimer", C_KillTimer);
+	RegisterFunction(ls_, "spawnnode", C_SpawnNode, sched);
+	RegisterFunction(ls_, "closenode", C_CloseNode, sched);
+	RegisterFunction(ls_, "sendmsg", C_SendMsg, sched);
+	RegisterFunction(ls_, "settimer", C_SetTimer, sched);
+	RegisterFunction(ls_, "killtimer", C_KillTimer, sched);
 
 	quit_ = false;
 	thread_ = new std::thread(std::bind(&Worker::Run, this));
@@ -72,7 +84,7 @@ void Worker::Destroy()
 
 		thread_->join();
 		delete thread_;
-		thread_ == nullptr;
+		thread_ = nullptr;
 	}
 
 	for (LnodeMap::iterator it = nodes_.begin();
@@ -121,12 +133,14 @@ void Worker::ProcessMsg(const Message& msg)
 			{
 			CreateNodeST* ptr = (CreateNodeST*)msg.content;
 			std::string class_name(ptr->name);
+			std::string config(ptr->config);
 			std::string file_name(class_name);
 			transform(class_name.begin(), class_name.end(), 
 					file_name.begin(), tolower);
 			file_name += ".lua";
-			CreateNode(ptr->id, file_name, class_name);
+			CreateNode(ptr->id, file_name, class_name, config);
 			free(ptr->name);
+			free(ptr->config);
 			}
 			break;
 		case MSG_TYPE_WORKER_DESTROYNODE:
@@ -152,7 +166,9 @@ void Worker::ProcessMsg(const Message& msg)
 	}
 }
 
-unsigned int Worker::SpawnNode(const std::string& node_name)
+unsigned int Worker::SpawnNode(
+		const std::string& name, 
+		const std::string& config)
 {
 	unsigned int nid = 0;
 
@@ -172,7 +188,11 @@ unsigned int Worker::SpawnNode(const std::string& node_name)
 	msg_create_node.size = sizeof(CreateNodeST);
 	CreateNodeST* ptr = (CreateNodeST*)malloc(sizeof(CreateNodeST));
 	ptr->id = nid;
-	ptr->name = strdup(node_name.c_str());
+	ptr->name = strdup(name.c_str());
+	if (config.empty())
+		ptr->config = nullptr;
+	else
+		ptr->config = strdup(config.c_str());
 	msg_create_node.content = (char*)ptr;
 	msg_create_node.to = id_;
 	SendMsg(msg_create_node);
@@ -267,8 +287,11 @@ bool Worker::LoadLuaNode(const std::string& file, const std::string& node,
 	return true;
 }
 
-void Worker::CreateNode(unsigned int nid, const std::string& srcfile, 
-		const std::string& class_name)
+void Worker::CreateNode(
+		unsigned int nid, 
+		const std::string& srcfile, 
+		const std::string& class_name,
+		const std::string& config)
 {
 	LuaNodeCache cache;
 	if (!LoadLuaNode(srcfile, class_name, cache))
@@ -278,7 +301,7 @@ void Worker::CreateNode(unsigned int nid, const std::string& srcfile,
 	}
 
 	Lnode* node = new Lnode(nid);
-	if (node->Create(ls_, class_name, cache.refnew))
+	if (node->Create(ls_, class_name, config, cache.refnew))
 	{
 		nodes_.insert(std::make_pair(nid, node));
 	}

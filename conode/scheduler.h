@@ -8,33 +8,28 @@
 #include "msgrouter.h"
 
 class Worker;
-class CnodeModule;
-class Cnode;
+class CnodeManager;
 class Scheduler : public MsgRouter
 {
 public:
-	static Scheduler* GetInstance();
+	Scheduler();
+	~Scheduler();
 
-	bool Create();
+	bool Create(int worker_count, const char* mainnode);
 	void Close();
 
-	unsigned int SpawnNode(const std::string& node_name);
+	unsigned int SpawnNode(const std::string& name, const std::string& config);
 	void CloseNode(unsigned int nid);
+	void* SpawnCnode(const std::string& name, const std::string& config);
+	void CloseCnode(void* ptr);
 	// MsgRouter implement
 	virtual void SendMsg(const Message& msg);
 	unsigned int SetTimer(unsigned int nid, int interval);
 	void KillTimer(unsigned int nid, unsigned int tid);
 
 private:
-	Scheduler();
-	~Scheduler();
-
 	int NextWorkerIdx();
 	Worker* GetWorkerByNodeId(unsigned int nid);
-
-	// Cnode
-	Cnode* LoadCnode(const std::string& name, unsigned int id, 
-		const std::string& config);
 
 private:
 	int worker_count_;
@@ -43,9 +38,6 @@ private:
 	typedef std::vector<Worker*> WorkerVec;
 	WorkerVec workers_;
 	std::atomic<unsigned int> counter_;
-	typedef std::map<std::string, CnodeModule*> CnodeModuleMap;
-	CnodeModuleMap cnode_modules_;
-	typedef std::map<unsigned int, Cnode*> CnodeMap;
-	CnodeMap cnodes_;
+	CnodeManager* cnodemgr_;
 };
 

@@ -1,9 +1,8 @@
 #include "idallocator.h"
 
-
 IdAllocator::IdAllocator(unsigned int seed_id, unsigned int range)
-	: maxid_(seed_id + range)
-	, lastid_(seed_id + 1)
+	: maxid_(seed_id + range - 1)
+	, lastid_(seed_id)
 {
 }
 

@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/epoll.h>
+#include "msgdefine.h"
 #include "socketsendclientmsg.h"
 #include "socketrecvclientmsg.h"
 #include "socketconnectionbreakmsg.h"

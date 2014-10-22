@@ -18,8 +18,8 @@ struct NetMsg
 	char content[];
 };
 
-#define MSG_TYPE_ECHO			1000
-#define MSG_TYPE_PLAYER_LOGIN	1001
+#define MSG_TYPE_ECHO			1100
+#define MSG_TYPE_PLAYER_LOGIN	1101
 
 bool LoadSproto(CppSproto& sp)
 {

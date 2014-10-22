@@ -4,6 +4,7 @@
 #include <list>
 #include "message.h"
 #include "eventhandler.h"
+#include "netmsg.h"
 
 class SocketServer;
 class StreamSocket : public EventHandler

@@ -50,6 +50,8 @@ function MainNode.New(nid)
 	local proto = loadproto("proto/socketnode.sp", "proto/client.sp")
 	node.sp = sproto.parse(proto)
 	assert(node.sp)
+
+	node.sknode = spawnnode("libsocketnode.so", "listenport=8021")
 	return node
 end
 

@@ -1,4 +1,3 @@
-#include <string>
 #include <dlfcn.h>
 #include "cnodemodule.h"
 
@@ -17,13 +16,9 @@ CnodeModule::~CnodeModule()
 	Close();
 }
 
-bool CnodeModule::Load(const char* cnode_name)
+bool CnodeModule::Load(const char* libname)
 {
-	std::string libname("lib");
-	libname += cnode_name;
-	libname += ".so";
-
-	void* lib = dlopen(libname.c_str(), RTLD_LAZY);
+	void* lib = dlopen(libname, RTLD_LAZY);
 	if (lib == nullptr)
 	{
 		return false;
@@ -42,15 +37,6 @@ bool CnodeModule::Load(const char* cnode_name)
 
 void CnodeModule::Close()
 {
-	for (CnodeList::iterator it = nodes_.begin();
-			it != nodes_.end(); ++it)
-	{
-		Cnode* node = *it;
-		node->Close();
-		ReleaseCnode(node);
-	}
-	nodes_.clear();
-
 	if (lib_)
 	{
 		dlclose(lib_);
