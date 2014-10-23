@@ -6,14 +6,14 @@ Conode is a concurrent program library that base on message drive model.
 #### Node
 Node is a independent unit in conode.It has name, id, timer, can send or receive message.There are lnode(lua node) and cnode(c/cpp node).
 * Lnode
-Lnode is a piece of lua code that will be called by library on some event.For example, a lnode named "ExampleNode" like these:
+  Lnode is a piece of lua code that will be called by library on some event.For example, a lnode named "ExampleNode" like these:
 ```
 ExampleNode = {}
 ExampleNode.__index = ExampleNode
 
 function ExampleNode.New(nid)
 	local node = {}
-	setmetatable(node, MainNode)
+	setmetatable(node, ExampleNode)
 	node.id = nid
 	-- Initialize node
 	-- TODO
@@ -33,7 +33,7 @@ function ExampleNode:OnTimer(tid)
 end
 ```
 * Cnode
-Cnode is a shared library that implement cnode interface.It has own execute routine, and can send or receive message to/from other nodes.Please see include/cnode.h and include/msgrouter.h about detail.
+  Cnode is a shared library that implement cnode interface.It has own execute routine, and can send or receive message to/from other nodes.Please see include/cnode.h and include/msgrouter.h about detail.
 
 #### conode library
 * Conode library provide 5 api for Lnode:
