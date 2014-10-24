@@ -2,7 +2,6 @@
 
 #include <chrono>
 #include <list>
-#include <mutex>
 #include "lnode.h"
 #include "idallocator.h"
 
@@ -22,10 +21,10 @@ struct Timer
 class TimerService
 {
 public:
-	TimerService();
+	TimerService(unsigned int id);
 	~TimerService();
 
-	Timer* CreateTimer(unsigned int tid, int interval, Lnode* node);
+	unsigned int CreateTimer(int interval, Lnode* node);
 	void DestroyTimer(unsigned int tid, Lnode* node);
 	void OnTick();
 
@@ -36,6 +35,5 @@ private:
 	typedef std::list<Timer*> TimerList;
 	TimerList timers_;
 	IdAllocator tids_;
-	std::mutex tidmutex_;
 };
 

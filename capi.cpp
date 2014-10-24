@@ -73,7 +73,7 @@ int C_SetTimer(lua_State* L)
 
 	unsigned int nid = (unsigned int)luaL_checkint(L, 1);
 	int interval = luaL_checkint(L, 2);
-	unsigned int timer_id = sched->SetTimer(nid, interval);
+	unsigned int timer_id = sched->SetTimer(L, nid, interval);
 	lua_pushinteger(L, (int)timer_id);
 	return 1;
 }
@@ -88,7 +88,7 @@ int C_KillTimer(lua_State* L)
 
 	unsigned int nid = (unsigned int)luaL_checkint(L, 1);
 	unsigned int tid = luaL_checkint(L, 2);
-	sched->KillTimer(nid, tid);
+	sched->KillTimer(L, nid, tid);
 	return 0;
 }
 

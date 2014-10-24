@@ -24,8 +24,8 @@ public:
 	unsigned int SpawnNode(const char* name, const char* config);
 	void CloseNode(unsigned int nid);
 	void SendMsg(const Message& msg);
-	unsigned int SetTimer(unsigned nid, int interval);
-	void KillTimer(unsigned int nid, unsigned int tid);
+	unsigned int SetTimer(lua_State* L, unsigned nid, int interval);
+	void KillTimer(lua_State* L, unsigned int nid, unsigned int tid);
 
 	unsigned int GetId() const { return id_; }
 
@@ -38,7 +38,7 @@ private:
 			const std::string& class_name, 
 			const char* config);
 	void DestroyNode(unsigned int nid);
-	void CreateTimer(unsigned int nid, unsigned int tid, int interval);
+	unsigned int CreateTimer(unsigned int nid, int interval);
 	void DestroyTimer(unsigned int nid, unsigned int tid);
 	struct LuaNodeCache;
 	bool LoadLuaNode(

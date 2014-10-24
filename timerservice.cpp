@@ -2,8 +2,8 @@
 
 #define MAX_TIMER_COUNT		0xFFFFFFFF
 
-TimerService::TimerService()
-	: tids_(0, MAX_TIMER_COUNT)
+TimerService::TimerService(unsigned int id)
+	: tids_(id + 1, MAX_TIMER_COUNT)
 {
 }
 
@@ -17,8 +17,12 @@ TimerService::~TimerService()
 	}
 }
 
-Timer* TimerService::CreateTimer(unsigned tid, int interval, Lnode* node)
+unsigned int TimerService::CreateTimer(int interval, Lnode* node)
 {
+	unsigned int tid = tids_.Assign();
+	if (tid == 0)
+		return 0;
+
 	Timer* timer = new Timer;
 	timer->id = tid;
 	timer->interval = interval;
@@ -30,7 +34,7 @@ Timer* TimerService::CreateTimer(unsigned tid, int interval, Lnode* node)
 	timers_.sort();
 
 	node->AddTimer(timer);
-	return timer;
+	return tid;
 }
 
 void TimerService::DestroyTimer(unsigned int tid, Lnode* node)
@@ -49,7 +53,7 @@ void TimerService::OnTick()
 		if (timer->interval == -1)
 		{
 			// remove
-			ReleaseTimerId(timer->id);
+			tids_.Recycle(timer->id);
 			delete timer;
 			it = timers_.erase(it);
 		}
@@ -70,19 +74,5 @@ void TimerService::OnTick()
 	{
 		timers_.sort();
 	}
-}
-
-unsigned int TimerService::AssignTimerId()
-{
-	std::lock_guard<std::mutex> lock(tidmutex_);
-
-	return tids_.Assign();
-}
-
-void TimerService::ReleaseTimerId(unsigned int id)
-{
-	std::lock_guard<std::mutex> lock(tidmutex_);
-	
-	tids_.Recycle(id);
 }
 

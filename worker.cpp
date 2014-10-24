@@ -17,6 +17,7 @@ Worker::Worker(unsigned int id)
 	, thread_(nullptr)
 	, quit_(false)
 	, nids_(id + 1, MAX_NODE_COUNT)
+	, ts_(id)
 {
 }
 
@@ -148,18 +149,6 @@ void Worker::ProcessMsg(const Message& msg)
 			DestroyNode(ptr->id);
 			}
 			break;
-		case MSG_TYPE_WORKER_CREATETIMER:
-			{
-			CreateTimerST* ptr = (CreateTimerST*)msg.content;
-			CreateTimer(ptr->nid, ptr->tid, ptr->interval);
-			}
-			break;
-		case MSG_TYPE_WORKER_DESTROYTIMER:
-			{
-			DestroyTimerST* ptr = (DestroyTimerST*)msg.content;
-			DestroyTimer(ptr->nid, ptr->tid);
-			}
-			break;
 		default:
 			break;
 	}
@@ -216,37 +205,34 @@ void Worker::SendMsg(const Message& msg)
 	msgs_.Add(msg);
 }
 
-unsigned int Worker::SetTimer(unsigned int nid, int interval)
+unsigned int Worker::SetTimer(lua_State* L, unsigned int nid, int interval)
 {
-	unsigned int tid = ts_.AssignTimerId();
-	if (tid == 0)
-		return 0;
+	if (ls_ != L)
+	{
+		lua_rawgeti(L, LUA_REGISTRYINDEX, LUA_RIDX_MAINTHREAD);
+		lua_State* mL = lua_tothread(L, -1);
+	    lua_pop(L, 1);
 
-	Message msg_create_timer;
-	msg_create_timer.type = MSG_TYPE_WORKER_CREATETIMER;
-	msg_create_timer.size = sizeof(CreateTimerST);
-	CreateTimerST* ptr = (CreateTimerST*)malloc(sizeof(CreateTimerST));
-	ptr->nid = nid;
-	ptr->tid = tid;
-	ptr->interval = interval;
-	msg_create_timer.content = (char*)ptr;
-	msg_create_timer.to = id_;
-	SendMsg(msg_create_timer);
+		if (ls_ != mL)
+			return 0;
+	}
 
-	return tid;
+	return CreateTimer(nid, interval);
 }
 
-void Worker::KillTimer(unsigned int nid, unsigned int tid)
+void Worker::KillTimer(lua_State* L, unsigned int nid, unsigned int tid)
 {
-	Message msg_destroy_timer;
-	msg_destroy_timer.type = MSG_TYPE_WORKER_DESTROYTIMER;
-	msg_destroy_timer.size = sizeof(DestroyTimerST);
-	DestroyTimerST* ptr = (DestroyTimerST*)malloc(sizeof(DestroyTimerST));
-	ptr->nid = nid;
-	ptr->tid = tid;
-	msg_destroy_timer.content = (char*)ptr;
-	msg_destroy_timer.to = id_;
-	SendMsg(msg_destroy_timer);
+	if (ls_ != L)
+	{
+		lua_rawgeti(L, LUA_REGISTRYINDEX, LUA_RIDX_MAINTHREAD);
+		lua_State* mL = lua_tothread(L, -1);
+	    lua_pop(L, 1);
+
+		if (ls_ != mL)
+			return;
+	}
+
+	DestroyTimer(nid, tid);
 }
 
 bool Worker::LoadLuaNode(const std::string& file, const std::string& node,
@@ -327,14 +313,14 @@ void Worker::DestroyNode(unsigned int nid)
 	idmutex_.unlock();
 }
 
-void Worker::CreateTimer(unsigned int nid, unsigned int tid, int interval)
+unsigned int Worker::CreateTimer(unsigned int nid, int interval)
 {
 	LnodeMap::iterator it = nodes_.find(nid);
 	if (it == nodes_.end())
-		return;
+		return 0;
 
 	Lnode* node = it->second;
-	ts_.CreateTimer(tid, interval, node);
+	return ts_.CreateTimer(interval, node);
 }
 
 void Worker::DestroyTimer(unsigned int nid, unsigned int tid)

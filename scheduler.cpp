@@ -1,5 +1,4 @@
 #include <string.h>
-#include "lua.hpp"
 #include "capi.h"
 #include "worker.h"
 #include "cnodemanager.h"
@@ -159,22 +158,22 @@ void Scheduler::SendMsg(const Message& msg)
 	}
 }
 
-unsigned int Scheduler::SetTimer(unsigned int nid, int interval)
+unsigned int Scheduler::SetTimer(lua_State* L, unsigned int nid, int interval)
 {
 	Worker* worker = GetWorkerByNodeId(nid);
 	if (worker == nullptr)
 		return 0;
 
-	return worker->SetTimer(nid, interval);
+	return worker->SetTimer(L, nid, interval);
 }
 
-void Scheduler::KillTimer(unsigned int nid, unsigned int tid)
+void Scheduler::KillTimer(lua_State* L, unsigned int nid, unsigned int tid)
 {
 	Worker* worker = GetWorkerByNodeId(nid);
 	if (worker == nullptr)
 		return;
 
-	worker->KillTimer(nid, tid);
+	worker->KillTimer(L, nid, tid);
 }
 
 int Scheduler::NextWorkerIdx()

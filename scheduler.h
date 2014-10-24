@@ -4,6 +4,7 @@
 #include <map>
 #include <string>
 #include <atomic>
+#include "lua.hpp"
 #include "message.h"
 #include "msgrouter.h"
 
@@ -22,8 +23,8 @@ public:
 	void CloseNode(unsigned int nid);
 	// MsgRouter implement
 	virtual void SendMsg(const Message& msg);
-	unsigned int SetTimer(unsigned int nid, int interval);
-	void KillTimer(unsigned int nid, unsigned int tid);
+	unsigned int SetTimer(lua_State* L, unsigned int nid, int interval);
+	void KillTimer(lua_State* L, unsigned int nid, unsigned int tid);
 
 private:
 	int NextWorkerIdx();
