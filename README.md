@@ -57,3 +57,8 @@ killtimer(id, timerid)
 void* conode_start(int worker, const char* mainnode);
 void conode_stop(void* handle);
 ```
+If you call this:
+```
+conode_start(2, "ExampleNode")
+```
+Library will initialize two thread, and spawn a node that name is "ExampleNode" from "examplenode.lua" in your running directory.
