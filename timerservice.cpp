@@ -1,6 +1,6 @@
 #include "timerservice.h"
 
-#define MAX_TIMER_COUNT		0xFFFFFFFF
+#define MAX_TIMER_COUNT		0x00FFFFFF
 
 TimerService::TimerService(unsigned int id)
 	: tids_(id + 1, MAX_TIMER_COUNT)
