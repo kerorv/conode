@@ -6,26 +6,29 @@ Conode is a concurrent program library that base on message drive model.
 #### Node
 Node is a independent unit in conode.It has name, id, timer, can send or receive message.There are lnode(lua node) and cnode(c/cpp node).
 * Lnode
-  Lnode is a piece of lua code that will be called by library on some event.For example, a lnode named "ExampleNode" like these:
+
+Lnode is a piece of lua code that will be called by library on some event.For example, a lnode named "ExampleNode" like these:
 ```
 ExampleNode = {}
 ExampleNode.__index = ExampleNode
 
 function ExampleNode.New(nid)
+	-- It will be called after spawnnode
 	local node = {}
 	setmetatable(node, ExampleNode)
 	node.id = nid
+
 	-- Initialize node
 	-- TODO
 	return node
 end
 
 function ExampleNode:Release()
-	-- closenode will call it
+	-- It will be called it after closenode 
 end
 
 function ExampleNode:OnMessage(type, ptr, len)
-	-- receive message will call it
+	-- It will be called if this node has message
 end
 
 function ExampleNode:OnTimer(tid)
@@ -33,14 +36,15 @@ function ExampleNode:OnTimer(tid)
 end
 ```
 * Cnode
-  Cnode is a shared library that implement cnode interface.It has own execute routine, and can send or receive message to/from other nodes.Please see include/cnode.h and include/msgrouter.h about detail.
+
+Cnode is a shared library that implement cnode interface.It has own execute routine, and can send or receive message to/from other nodes.Please see include/cnode.h and include/msgrouter.h about detail.
 
 #### conode library
 * Conode library provide 5 api for Lnode:
 ```
 spawnnode(name, config)
 closenode(id)
-sendmsg(type, ptr, len)
+sendmsg(type, msg, len)
 settimer(id, interval)
 killtimer(id, timerid)
 ```
