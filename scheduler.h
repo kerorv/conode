@@ -16,7 +16,7 @@ public:
 	Scheduler();
 	~Scheduler();
 
-	bool Create(int worker_count, const char* mainnode);
+	bool Create(int worker_count, const char* mainnode, const char* config);
 	void Close();
 
 	unsigned int SpawnNode(const char* name, const char* config);

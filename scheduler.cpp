@@ -15,7 +15,10 @@ Scheduler::~Scheduler()
 {
 }
 
-bool Scheduler::Create(int worker_count, const char* mainnode)
+bool Scheduler::Create(
+		int worker_count, 
+		const char* mainnode, 
+		const char* config)
 {
 	// cnode manager
 	cnodemgr_ = new CnodeManager;
@@ -33,7 +36,7 @@ bool Scheduler::Create(int worker_count, const char* mainnode)
 	}
 
 	// spawn main node
-	main_node_id_ = SpawnNode(mainnode, nullptr);
+	main_node_id_ = SpawnNode(mainnode, config);
 	if (main_node_id_ == 0)
 	{
 		return false;

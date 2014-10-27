@@ -14,7 +14,10 @@
 extern "C" {
 #endif
 
-CONODE_API void* conode_start(int worker, const char* mainnode);
+CONODE_API void* conode_start(
+		int worker, 
+		const char* mainnode, 
+		const char* config);
 CONODE_API void conode_stop(void* handle);
 
 #ifdef __cplusplus

@@ -44,7 +44,7 @@ Cnode is a shared library that implement cnode interface.It has own execute rout
 ```
 spawnnode(name, config)
 closenode(id)
-sendmsg(type, msg, len)
+sendmsg(to_id, type, msg)
 settimer(id, interval)
 killtimer(id, timerid)
 ```
@@ -53,12 +53,13 @@ killtimer(id, timerid)
 ```
 // worker: concurrent thread count
 // mainnode: the name of main node
+// config: the config string of node
 // return: conode instance handle
-void* conode_start(int worker, const char* mainnode);
+void* conode_start(int worker, const char* mainnode, const char* config);
 void conode_stop(void* handle);
 ```
 If you call this:
 ```
-conode_start(2, "ExampleNode")
+conode_start(2, "ExampleNode", NULL)
 ```
 Library will initialize two thread, and spawn a node that name is "ExampleNode" from "examplenode.lua" in your running directory.
