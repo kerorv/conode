@@ -4,7 +4,7 @@ conode
 Conode is a concurrent program library that base on message drive model. 
 
 #### Node
-Node is a independent unit in conode.It has name, id, timer, can send or receive message.There are lnode(lua node) and cnode(c/cpp node).
+Node is a independent unit in conode.It can has id, name, timer, aslo can send or receive message.There are lnode(lua node) and cnode(c/cpp node).
 * Lnode
 
 Lnode is a piece of lua code that will be called by library on some event.For example, a lnode named "ExampleNode" like these:
@@ -12,15 +12,8 @@ Lnode is a piece of lua code that will be called by library on some event.For ex
 ExampleNode = {}
 ExampleNode.__index = ExampleNode
 
-function ExampleNode.New(nid)
-	-- It will be called after spawnnode
-	local node = {}
-	setmetatable(node, ExampleNode)
-	node.id = nid
-
-	-- Initialize node
-	-- TODO
-	return node
+function ExampleNode:Init(id, config)
+	-- initialize code
 end
 
 function ExampleNode:Release()
@@ -40,26 +33,30 @@ end
 Cnode is a shared library that implement cnode interface.It has own execute routine, and can send or receive message to/from other nodes.Please see include/cnode.h and include/msgrouter.h about detail.
 
 #### conode library
-* Conode library provide 5 api for Lnode:
+* Conode library provide 6 api for Lnode:
 ```
 spawnnode(name, config)
 closenode(id)
-sendmsg(to_id, type, msg)
-settimer(id, interval)
-killtimer(id, timerid)
+cnodeid(name)
+sendmsg(to, type, msg)
+settimer(interval)
+killtimer(timerid)
 ```
 * And provide MsgRouter interface for Cnode(Please see include/msgrouter.h and include/cnode.h).
 * open and close library
 ```
-// worker: concurrent thread count
-// mainnode: the name of main node
-// config: the config string of node
+// load config.lua and start conode
 // return: conode instance handle
-void* conode_start(int worker, const char* mainnode, const char* config);
+void* conode_start();
 void conode_stop(void* handle);
 ```
-If you call this:
+If your config.lua like these:
 ```
-conode_start(2, "ExampleNode", NULL)
+worker = 2
+mainnode = { name="ExampleNode", config="" }
+cnode = {
+--	{ name="socketnode", lib="libsocketnode.so", config="listenport=8021" },
+--	{ name="dbnode", lib="libdb.so", config="..."}
+}
 ```
 Library will initialize two thread, and spawn a node that name is "ExampleNode" from "examplenode.lua" in your running directory.

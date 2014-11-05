@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "scheduler.h"
+#include "lnode.h"
 #include "capi.h"
 
 int C_SpawnNode(lua_State* L)
@@ -37,6 +38,23 @@ int C_CloseNode(lua_State* L)
 	return 0;
 }
 
+int C_CnodeId(lua_State* L)
+{
+	// lua code:
+	// node_id = cnodeid(name)
+	Scheduler* sched = (Scheduler*)lua_touserdata(L, lua_upvalueindex(1));
+	if (sched == nullptr)
+	{
+		lua_pushinteger(L, 0);
+		return 1;
+	}
+
+	const char* name = luaL_checkstring(L, 1);
+	unsigned int cnode_id = sched->GetCnodeId(name);
+	lua_pushinteger(L, (int)cnode_id);
+	return 1;
+}
+
 int C_SendMsg(lua_State* L)
 {
 	// lua code:
@@ -63,17 +81,16 @@ int C_SendMsg(lua_State* L)
 int C_SetTimer(lua_State* L)
 {
 	// lua code:
-	// timer_id = settimer(node_id, interval)
-	Scheduler* sched = (Scheduler*)lua_touserdata(L, lua_upvalueindex(1));
-	if (sched == nullptr)
+	// timer_id = settimer(interval)
+	Lnode* node = (Lnode*)lua_touserdata(L, lua_upvalueindex(1));
+	if (node == nullptr)
 	{
 		lua_pushinteger(L, 0);
 		return 1;
 	}
 
-	unsigned int nid = (unsigned int)luaL_checkint(L, 1);
-	int interval = luaL_checkint(L, 2);
-	unsigned int timer_id = sched->SetTimer(L, nid, interval);
+	int interval = luaL_checkint(L, 1);
+	unsigned int timer_id = node->SetTimer(interval);
 	lua_pushinteger(L, (int)timer_id);
 	return 1;
 }
@@ -81,14 +98,13 @@ int C_SetTimer(lua_State* L)
 int C_KillTimer(lua_State* L)
 {
 	// lua code:
-	// killtimer(node_id, timer_id)
-	Scheduler* sched = (Scheduler*)lua_touserdata(L, lua_upvalueindex(1));
-	if (sched == nullptr)
+	// killtimer(timer_id)
+	Lnode* node = (Lnode*)lua_touserdata(L, lua_upvalueindex(1));
+	if (node == nullptr)
 		return 0;
 
-	unsigned int nid = (unsigned int)luaL_checkint(L, 1);
-	unsigned int tid = luaL_checkint(L, 2);
-	sched->KillTimer(L, nid, tid);
+	unsigned int tid = luaL_checkint(L, 1);
+	node->KillTimer(tid);
 	return 0;
 }
 

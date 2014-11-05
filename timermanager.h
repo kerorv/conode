@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <list>
+#include <vector>
 #include "lnode.h"
 #include "idallocator.h"
 
@@ -18,22 +19,20 @@ struct Timer
 	}
 };
 
-class TimerService
+class TimerManager
 {
 public:
-	TimerService(unsigned int id);
-	~TimerService();
+	TimerManager(unsigned int id);
+	~TimerManager();
 
-	unsigned int CreateTimer(int interval, Lnode* node);
-	void DestroyTimer(unsigned int tid, Lnode* node);
+	Timer* CreateTimer(int interval, Lnode* node);
 	void OnTick();
-
-	unsigned int AssignTimerId();
-	void ReleaseTimerId(unsigned int id);
 
 private:
 	typedef std::list<Timer*> TimerList;
 	TimerList timers_;
+	typedef std::vector<Timer*> TimerVector;
+	TimerVector timerevents_;
 	IdAllocator tids_;
 };
 

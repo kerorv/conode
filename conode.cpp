@@ -1,13 +1,10 @@
 #include "conode.h"
 #include "scheduler.h"
 
-CONODE_API void* conode_start(
-		int worker, 
-		const char* mainnode, 
-		const char* config)
+CONODE_API void* conode_start()
 {
 	Scheduler* sched = new Scheduler();
-	if (!sched->Create(worker, mainnode, config))
+	if (!sched->Create())
 	{
 		sched->Close();
 		return NULL;

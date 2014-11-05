@@ -4,33 +4,33 @@
 #include "lua.hpp"
 #include "message.h"
 
+class Worker;
 struct Timer;
 class Lnode
 {
 public:
-	Lnode(unsigned int id);
+	Lnode(Worker* worker, unsigned int id);
 	~Lnode();
 
-	bool Create(
-			lua_State* L, 
-			const char* config, 
-			int refnew);
+	bool Create(const char* file, const char* name, const char* config);
 	void Destroy();
 	void ProcessMsg(const Message& msg);
 	void OnTimer(unsigned int tid);
 
-	void AddTimer(Timer* timer);
-	void RemoveTimer(unsigned int tid);
+	unsigned int SetTimer(int interval);
+	void KillTimer(unsigned int tid);
 
 	unsigned int GetId() const { return id_; }
 
 private:
-	bool CallNew(const char* config, int ref);
+	void RegisterApi();
+	void CallInit(unsigned int id, const char* config);
 	void CallRelease();
 	void CallOnMessage(const Message& msg);
 	void CallOnTimer(unsigned int tid);
 
 private:
+	Worker* worker_;
 	unsigned int id_;
 	lua_State* ls_;
 	typedef std::list<Timer*> TimerList;

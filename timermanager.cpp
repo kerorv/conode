@@ -1,13 +1,14 @@
-#include "timerservice.h"
+#include "timermanager.h"
 
 #define MAX_TIMER_COUNT		0x00FFFFFF
 
-TimerService::TimerService(unsigned int id)
+TimerManager::TimerManager(unsigned int id)
 	: tids_(id + 1, MAX_TIMER_COUNT)
 {
+	timerevents_.reserve(64);
 }
 
-TimerService::~TimerService()
+TimerManager::~TimerManager()
 {
 	for (TimerList::iterator it = timers_.begin();
 			it != timers_.end(); ++it)
@@ -17,11 +18,11 @@ TimerService::~TimerService()
 	}
 }
 
-unsigned int TimerService::CreateTimer(int interval, Lnode* node)
+Timer* TimerManager::CreateTimer(int interval, Lnode* node)
 {
 	unsigned int tid = tids_.Assign();
 	if (tid == 0)
-		return 0;
+		return nullptr;
 
 	Timer* timer = new Timer;
 	timer->id = tid;
@@ -33,16 +34,10 @@ unsigned int TimerService::CreateTimer(int interval, Lnode* node)
 	timers_.push_back(timer);
 	timers_.sort();
 
-	node->AddTimer(timer);
-	return tid;
+	return timer;
 }
 
-void TimerService::DestroyTimer(unsigned int tid, Lnode* node)
-{
-	node->RemoveTimer(tid);
-}
-
-void TimerService::OnTick()
+void TimerManager::OnTick()
 {
 	bool need_sort = false;
 	std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
@@ -63,12 +58,20 @@ void TimerService::OnTick()
 				break;
 
 			timer->next_time = now + std::chrono::milliseconds(timer->interval);
-			timer->node->OnTimer(timer->id);
+			timerevents_.push_back(timer);
 			++it;
 
 			need_sort = true;
 		}
 	}
+
+	for (TimerVector::iterator it = timerevents_.begin();
+			it != timerevents_.end(); ++it)
+	{
+		Timer* timer = *it;
+		timer->node->OnTimer(timer->id);
+	}
+	timerevents_.clear();
 
 	if (need_sort)
 	{

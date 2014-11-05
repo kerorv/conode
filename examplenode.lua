@@ -1,15 +1,8 @@
 ExampleNode = {}
 ExampleNode.__index = ExampleNode
 
-function ExampleNode.New(nid)
-	-- It will be called after spawnnode
-	local node = {}
-	setmetatable(node, ExampleNode)
-	node.id = nid
-
-	-- Initialize node
-	-- TODO
-	return node
+function ExampleNode:Init(id, config)
+	-- initialize code
 end
 
 function ExampleNode:Release()

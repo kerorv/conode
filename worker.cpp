@@ -11,13 +11,13 @@
 
 #define MAX_NODE_COUNT	0x00FFFFFF
 
-Worker::Worker(unsigned int id)
-	: id_(id)
-	, ls_(nullptr)
+Worker::Worker(Scheduler* sched, unsigned int id)
+	: sched_(sched)
+	, id_(id)
 	, thread_(nullptr)
 	, quit_(false)
 	, nids_(id + 1, MAX_NODE_COUNT)
-	, ts_(id)
+	, tm_(id)
 {
 }
 
@@ -25,31 +25,8 @@ Worker::~Worker()
 {
 }
 
-static void RegisterFunction(
-		lua_State* L, 
-		const char* name,
-		lua_CFunction fn, 
-		void* sched)
+bool Worker::Create()
 {
-	lua_pushlightuserdata(L, sched);
-	lua_pushcclosure(L, fn, 1);
-	lua_setglobal(L, name);
-}
-
-bool Worker::Create(void* sched)
-{
-	ls_ = luaL_newstate();
-	if (ls_ == nullptr)
-		return false;
-
-	luaL_openlibs(ls_);
-
-	RegisterFunction(ls_, "spawnnode", C_SpawnNode, sched);
-	RegisterFunction(ls_, "closenode", C_CloseNode, sched);
-	RegisterFunction(ls_, "sendmsg", C_SendMsg, sched);
-	RegisterFunction(ls_, "settimer", C_SetTimer, sched);
-	RegisterFunction(ls_, "killtimer", C_KillTimer, sched);
-
 	quit_ = false;
 	thread_ = new std::thread(std::bind(&Worker::Run, this));
 
@@ -68,7 +45,7 @@ void Worker::Run()
 			free(msg.content);
 		}
 
-		ts_.OnTick();
+		tm_.OnTick();
 	}
 }
 
@@ -94,12 +71,6 @@ void Worker::Destroy()
 		Lnode* node = it->second;
 		node->Destroy();
 		delete node;
-	}
-
-	if (ls_)
-	{
-		lua_close(ls_);
-		ls_ = nullptr;
 	}
 }
 
@@ -132,21 +103,27 @@ void Worker::ProcessMsg(const Message& msg)
 			break;
 		case MSG_TYPE_WORKER_CREATENODE:
 			{
-			CreateNodeST* ptr = (CreateNodeST*)msg.content;
-			std::string class_name(ptr->name);
-			std::string file_name(class_name);
-			transform(class_name.begin(), class_name.end(), 
-					file_name.begin(), tolower);
-			file_name += ".lua";
-			CreateNode(ptr->id, file_name, class_name, ptr->config);
-			free(ptr->name);
-			free(ptr->config);
+				CreateNodeST* ptr = (CreateNodeST*)msg.content;
+				nodes_.insert(std::make_pair(ptr->id, (Lnode*)ptr->node));
 			}
 			break;
 		case MSG_TYPE_WORKER_DESTROYNODE:
 			{
-			DestroyNodeST* ptr = (DestroyNodeST*)msg.content;
-			DestroyNode(ptr->id);
+				DestroyNodeST* ptr = (DestroyNodeST*)msg.content;
+				unsigned int nid = ptr->id;
+				LnodeMap::iterator it = nodes_.find(nid);
+				if (it == nodes_.end())
+					return;
+
+				Lnode* node = it->second;
+				nodes_.erase(it);
+
+				node->Destroy();
+				delete node;
+
+				idmutex_.lock();
+				nids_.Recycle(nid);
+				idmutex_.unlock();
 			}
 			break;
 		default:
@@ -166,23 +143,30 @@ unsigned int Worker::SpawnNode(
 	if (nid == 0)
 		return 0;
 
-	// use a new lua state to load this node implement
-	// to check whether this node is completly implement
-	// TODO
+	std::string class_name(name);
+	std::string file_name(name);
+	transform(class_name.begin(), class_name.end(), 
+			file_name.begin(), tolower);
+	file_name += ".lua";
+	Lnode* node = new Lnode(this, nid);
+	if (!node->Create(file_name.c_str(), class_name.c_str(), config))
+	{
+		delete node;
+		idmutex_.lock();
+		nids_.Recycle(nid);
+		idmutex_.unlock();
+		return 0;
+	}
 	
 	// send create_node message
 	Message msg_create_node;
+	msg_create_node.to = id_; // to worker
 	msg_create_node.type = MSG_TYPE_WORKER_CREATENODE;
 	msg_create_node.size = sizeof(CreateNodeST);
 	CreateNodeST* ptr = (CreateNodeST*)malloc(sizeof(CreateNodeST));
 	ptr->id = nid;
-	ptr->name = strdup(name);
-	if (config == nullptr)
-		ptr->config = nullptr;
-	else
-		ptr->config = strdup(config);
+	ptr->node = node;
 	msg_create_node.content = (char*)ptr;
-	msg_create_node.to = id_;
 	SendMsg(msg_create_node);
 
 	return nid;
@@ -203,133 +187,5 @@ void Worker::CloseNode(unsigned int nid)
 void Worker::SendMsg(const Message& msg)
 {
 	msgs_.Add(msg);
-}
-
-unsigned int Worker::SetTimer(lua_State* L, unsigned int nid, int interval)
-{
-	if (ls_ != L)
-	{
-		lua_rawgeti(L, LUA_REGISTRYINDEX, LUA_RIDX_MAINTHREAD);
-		lua_State* mL = lua_tothread(L, -1);
-	    lua_pop(L, 1);
-
-		if (ls_ != mL)
-			return 0;
-	}
-
-	return CreateTimer(nid, interval);
-}
-
-void Worker::KillTimer(lua_State* L, unsigned int nid, unsigned int tid)
-{
-	if (ls_ != L)
-	{
-		lua_rawgeti(L, LUA_REGISTRYINDEX, LUA_RIDX_MAINTHREAD);
-		lua_State* mL = lua_tothread(L, -1);
-	    lua_pop(L, 1);
-
-		if (ls_ != mL)
-			return;
-	}
-
-	DestroyTimer(nid, tid);
-}
-
-bool Worker::LoadLuaNode(const std::string& file, const std::string& node,
-		Worker::LuaNodeCache& cache)
-{
-	LuaNodeCacheMap::iterator it = lua_node_caches_.find(file);
-	if (it != lua_node_caches_.end())
-	{
-		cache = it->second;
-	}
-	else
-	{
-		luaL_dofile(ls_, file.c_str());
-		lua_getglobal(ls_, node.c_str());
-		if (lua_istable(ls_, -1) == 0)
-		{
-			lua_pop(ls_, 1);
-			return false;
-		}
-
-		lua_getfield(ls_, -1, "New");
-		if (lua_isnil(ls_, -1) == 1)
-		{
-			lua_pop(ls_, 2);
-			return false;
-		}
-
-		int ref = luaL_ref(ls_, LUA_REGISTRYINDEX);
-		lua_pop(ls_, 1);	// global node
-
-		LuaNodeCache newcache;
-		newcache.refnew = ref;
-		lua_node_caches_.insert(std::make_pair(file, newcache));
-		cache = newcache;
-	}
-
-	return true;
-}
-
-void Worker::CreateNode(
-		unsigned int nid, 
-		const std::string& srcfile, 
-		const std::string& class_name,
-		const char* config)
-{
-	LuaNodeCache cache;
-	if (!LoadLuaNode(srcfile, class_name, cache))
-	{
-		// TODO
-		return ;
-	}
-
-	Lnode* node = new Lnode(nid);
-	if (node->Create(ls_, config, cache.refnew))
-	{
-		nodes_.insert(std::make_pair(nid, node));
-	}
-	else
-	{
-		// TODO
-	}
-}
-
-void Worker::DestroyNode(unsigned int nid)
-{
-	LnodeMap::iterator it = nodes_.find(nid);
-	if (it == nodes_.end())
-		return;
-
-	Lnode* node = it->second;
-	nodes_.erase(it);
-
-	node->Destroy();
-	delete node;
-
-	idmutex_.lock();
-	nids_.Recycle(nid);
-	idmutex_.unlock();
-}
-
-unsigned int Worker::CreateTimer(unsigned int nid, int interval)
-{
-	LnodeMap::iterator it = nodes_.find(nid);
-	if (it == nodes_.end())
-		return 0;
-
-	Lnode* node = it->second;
-	return ts_.CreateTimer(interval, node);
-}
-
-void Worker::DestroyTimer(unsigned int nid, unsigned int tid)
-{
-	LnodeMap::iterator it = nodes_.find(nid);
-	if (it == nodes_.end())
-		return;
-
-	Lnode* node = it->second;
-	ts_.DestroyTimer(tid, node);
 }
 

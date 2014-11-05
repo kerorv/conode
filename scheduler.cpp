@@ -1,7 +1,7 @@
 #include <string.h>
 #include "capi.h"
 #include "worker.h"
-#include "cnodemanager.h"
+#include "cnodemodule.h"
 #include "scheduler.h"
 
 #define MAX_WORKER_COUNT	255
@@ -15,28 +15,94 @@ Scheduler::~Scheduler()
 {
 }
 
-bool Scheduler::Create(
-		int worker_count, 
-		const char* mainnode, 
-		const char* config)
+bool Scheduler::Create()
 {
-	// cnode manager
-	cnodemgr_ = new CnodeManager;
-	if (!cnodemgr_->Create(this))
-		return false;
+	int worker_count;
+	std::string mainnode;
+	std::string nodeconfig;
+	lua_State* L = luaL_newstate();
+	luaL_dofile(L, "config.lua");
 
-	// worker
+	// worker count
+	lua_getglobal(L, "worker");
+	worker_count = luaL_checkint(L, -1);
+	if (worker_count == 0)
+		worker_count = 1;
+	else if (worker_count > MAX_WORKER_COUNT)
+		worker_count = MAX_WORKER_COUNT;
+	lua_pop(L, 1);
+
+	// main node
+	lua_getglobal(L, "main");
+	if (!lua_istable(L, -1))
+	{
+		lua_close(L);
+		return false;
+	}
+	lua_getfield(L, -1, "name");
+	const char* sz = luaL_checkstring(L, -1);
+	if (sz == nullptr || strlen(sz) == 0)
+	{
+		lua_close(L);
+		return false;
+	}
+	mainnode = sz;
+	lua_pop(L, 1);
+	lua_getfield(L, -1, "config");
+	sz = lua_tostring(L, -1);
+	if (sz)
+	{
+		nodeconfig = sz;
+	}
+	lua_pop(L, 2);
+
+	// load lnode
 	for (size_t i = 0; i < (size_t)worker_count; ++i)
 	{
-		Worker* worker = new Worker((unsigned int)(i + 1) << 24);
-		if (!worker->Create(this))
+		Worker* worker = new Worker(this, (unsigned int)(i + 1) << 24);
+		if (!worker->Create())
 			return false;
 
 		workers_.push_back(worker);
 	}
 
+	// load cnode
+	lua_getglobal(L, "cnode");
+	int cnode_count = luaL_len(L, -1);
+	for (int i = 1; i <= cnode_count; ++i)
+	{
+		unsigned int node_id = i + 1;
+		std::string node_name;
+		std::string lib_name;
+		std::string node_config;
+
+		lua_rawgeti(L, -1, i);
+		// node name
+		lua_getfield(L, -1, "name");
+		node_name = luaL_checkstring(L, -1);
+		lua_pop(L, 1);
+		// lib name
+		lua_getfield(L, -1, "lib");
+		lib_name = luaL_checkstring(L, -1);
+		lua_pop(L, 1);
+		// node config
+		lua_getfield(L, -1, "config");
+		if (!lua_isnil(L, -1))
+		{
+			node_config = luaL_checkstring(L, -1);
+		}
+		lua_pop(L, 1);
+
+		if (!LoadCnode(lib_name, node_id, node_name, node_config))
+		{
+			lua_close(L);
+			return false;
+		}
+	}
+	lua_close(L);
+
 	// spawn main node
-	main_node_id_ = SpawnNode(mainnode, config);
+	main_node_id_ = SpawnNode(mainnode.c_str(), nodeconfig.c_str());
 	if (main_node_id_ == 0)
 	{
 		return false;
@@ -56,10 +122,25 @@ void Scheduler::Close()
 	}
 
 	// stop cnode
-	if (cnodemgr_)
+	for (CnodeInstMap::iterator it = cnodeinsts_.begin();
+			it != cnodeinsts_.end(); ++it)
 	{
-		cnodemgr_->Destroy();
+		CnodeInst& inst = it->second;
+		Cnode* node = inst.node;
+		CnodeModule* module = inst.module;
+		node->Close();
+		module->ReleaseCnode(node);
 	}
+	cnodeinsts_.clear();
+
+	for (CnodeModuleMap::iterator it = cnode_modules_.begin();
+			it != cnode_modules_.end(); ++it)
+	{
+		CnodeModule* module = it->second;
+		module->Close();
+		delete module;
+	}
+	cnode_modules_.clear();
 
 	// clear lnode
 	for (WorkerVec::iterator it = workers_.begin();
@@ -69,10 +150,6 @@ void Scheduler::Close()
 		delete worker;
 	}
 	workers_.clear();
-
-	// clear cnode
-	delete cnodemgr_;
-	cnodemgr_ = nullptr;
 }
 
 unsigned int Scheduler::SpawnNode(
@@ -82,17 +159,6 @@ unsigned int Scheduler::SpawnNode(
 	if (name == nullptr)
 		return 0;
 
-	if (strlen(name) > 3)
-	{
-		const char* suffix = name + strlen(name) - 3;
-		if (strcmp(suffix, ".so") == 0)
-		{
-			// cnode
-			return cnodemgr_->SpawnNode(name, config);
-		}
-	}
-
-	// lnode
 	int worker_idx = NextWorkerIdx();
 	Worker* worker = workers_[worker_idx];
 	if (worker == nullptr)
@@ -113,20 +179,31 @@ void Scheduler::CloseNode(unsigned int nid)
 		// internal quit
 		// TODO
 	}
-	else if (nid > 1 && nid < workers_[0]->GetId())
-	{
-		// cnode
-		cnodemgr_->CloseNode(nid);
-	}
 	else
 	{
-		// lnode
 		Worker* worker = GetWorkerByNodeId(nid);
 		if (worker == nullptr)
 			return;
 
 		worker->CloseNode(nid);
 	}
+}
+
+unsigned int Scheduler::GetCnodeId(const char* name)
+{
+	if (name == nullptr)
+		return 0;
+
+	std::string strname(name);
+	for (CnodeInstMap::iterator it = cnodeinsts_.begin();
+			it != cnodeinsts_.end(); ++it)
+	{
+		CnodeInst& inst = it->second;
+		if (inst.name == strname)
+			return it->first;
+	}
+
+	return 0;
 }
 
 void Scheduler::SendMsg(const Message& msg)
@@ -149,7 +226,13 @@ void Scheduler::SendMsg(const Message& msg)
 	}
 	else if (msg.to < workers_[0]->GetId())	// send to cnode
 	{
-		cnodemgr_->SendMsg(msg);
+		CnodeInstMap::iterator it = cnodeinsts_.find(msg.to);
+		if (it != cnodeinsts_.end())
+		{
+			CnodeInst& inst = it->second;
+			Cnode* node = inst.node;
+			node->OnMessage(msg);
+		}
 	}
 	else	// send to lnode
 	{
@@ -159,24 +242,6 @@ void Scheduler::SendMsg(const Message& msg)
 
 		worker->SendMsg(msg);
 	}
-}
-
-unsigned int Scheduler::SetTimer(lua_State* L, unsigned int nid, int interval)
-{
-	Worker* worker = GetWorkerByNodeId(nid);
-	if (worker == nullptr)
-		return 0;
-
-	return worker->SetTimer(L, nid, interval);
-}
-
-void Scheduler::KillTimer(lua_State* L, unsigned int nid, unsigned int tid)
-{
-	Worker* worker = GetWorkerByNodeId(nid);
-	if (worker == nullptr)
-		return;
-
-	worker->KillTimer(L, nid, tid);
 }
 
 int Scheduler::NextWorkerIdx()
@@ -195,5 +260,61 @@ Worker* Scheduler::GetWorkerByNodeId(unsigned int nid)
 
 	Worker* w = workers_[worker_idx];
 	return w;
+}
+
+bool Scheduler::LoadCnode(
+		const std::string& libname, 
+		unsigned int id, 
+		const std::string& name, 
+		const std::string& config)
+{
+	// find whether has the same name cnode
+	for (CnodeInstMap::iterator it = cnodeinsts_.begin();
+			it != cnodeinsts_.end(); ++it)
+	{
+		CnodeInst& inst = it->second;
+		if (inst.name == name)
+			return false;
+	}
+	
+	// load module
+	CnodeModule* module = nullptr;
+	CnodeModuleMap::iterator it = cnode_modules_.find(libname);
+	if (it == cnode_modules_.end())
+	{
+		CnodeModule* new_module = new CnodeModule;
+		if (!new_module->Load(libname.c_str()))
+		{
+			delete module;
+			return false;
+		}
+
+		cnode_modules_.insert(std::make_pair(libname, new_module));
+		module = new_module;
+	}
+	else
+	{
+		module = it->second;
+	}
+
+	// create node
+	Cnode* node = module->CreateCnode();
+	if (node)
+	{
+		if (!node->Create(id, this, config.c_str()))
+		{
+			module->ReleaseCnode(node);
+			return false;
+		}
+
+		CnodeInst inst;
+		inst.name = name;
+		inst.node = node;
+		inst.module = module;
+		cnodeinsts_.insert(std::make_pair(id, inst));
+		return true;
+	}
+
+	return false;
 }
 
