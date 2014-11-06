@@ -68,35 +68,38 @@ bool Scheduler::Create()
 
 	// load cnode
 	lua_getglobal(L, "cnode");
-	int cnode_count = luaL_len(L, -1);
-	for (int i = 1; i <= cnode_count; ++i)
+	if (lua_istable(L, -1))
 	{
-		unsigned int node_id = i + 1;
-		std::string node_name;
-		std::string lib_name;
-		std::string node_config;
-
-		lua_rawgeti(L, -1, i);
-		// node name
-		lua_getfield(L, -1, "name");
-		node_name = luaL_checkstring(L, -1);
-		lua_pop(L, 1);
-		// lib name
-		lua_getfield(L, -1, "lib");
-		lib_name = luaL_checkstring(L, -1);
-		lua_pop(L, 1);
-		// node config
-		lua_getfield(L, -1, "config");
-		if (!lua_isnil(L, -1))
+		int cnode_count = luaL_len(L, -1);
+		for (int i = 1; i <= cnode_count; ++i)
 		{
-			node_config = luaL_checkstring(L, -1);
-		}
-		lua_pop(L, 1);
+			unsigned int node_id = i + 1;
+			std::string node_name;
+			std::string lib_name;
+			std::string node_config;
 
-		if (!LoadCnode(lib_name, node_id, node_name, node_config))
-		{
-			lua_close(L);
-			return false;
+			lua_rawgeti(L, -1, i);
+			// node name
+			lua_getfield(L, -1, "name");
+			node_name = luaL_checkstring(L, -1);
+			lua_pop(L, 1);
+			// lib name
+			lua_getfield(L, -1, "lib");
+			lib_name = luaL_checkstring(L, -1);
+			lua_pop(L, 1);
+			// node config
+			lua_getfield(L, -1, "config");
+			if (!lua_isnil(L, -1))
+			{
+				node_config = luaL_checkstring(L, -1);
+			}
+			lua_pop(L, 1);
+
+			if (!LoadCnode(lib_name, node_id, node_name, node_config))
+			{
+				lua_close(L);
+				return false;
+			}
 		}
 	}
 	lua_close(L);
@@ -127,8 +130,15 @@ void Scheduler::Close()
 	{
 		CnodeInst& inst = it->second;
 		Cnode* node = inst.node;
-		CnodeModule* module = inst.module;
 		node->Close();
+	}
+
+	// clear cnode
+	for (CnodeInstMap::iterator it = cnodeinsts_.begin();
+			it != cnodeinsts_.end(); ++it)
+	{
+		CnodeInst& inst = it->second;
+		Cnode* node = inst.node;
 		module->ReleaseCnode(node);
 	}
 	cnodeinsts_.clear();
